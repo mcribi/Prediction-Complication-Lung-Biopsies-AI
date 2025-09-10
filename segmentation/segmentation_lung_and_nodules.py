@@ -10,7 +10,7 @@ def segmentation_lung_and_nodules(input_dir, output_dir, force_cpu=False):
             continue
 
         ruta_entrada = os.path.join(input_dir, archivo)
-        # TotalSegmentator crea una carpeta y dentro guarda los .nii.gz por etiqueta
+        #TotalSegmentator create a directory and it save in the .nii.gz by target
         ruta_salida = os.path.join(
             output_dir, archivo.replace(".nii.gz","").replace(".nii","") + "_seg"
         )
@@ -19,9 +19,9 @@ def segmentation_lung_and_nodules(input_dir, output_dir, force_cpu=False):
         totalsegmentator(
             input=ruta_entrada,
             output=ruta_salida,
-            task="lung_nodules",   # <- cambio clave
-            ml=True,
-            fast=False,            # prueba sin fast
+            task="lung_nodules",   #instead of total, we now segment lung nodules
+            #ml=True, #the two mask (nodules and lung) are in the same file
+            fast=False,       
             device="cpu" if force_cpu else "gpu",
             verbose=True
         )
@@ -29,6 +29,6 @@ def segmentation_lung_and_nodules(input_dir, output_dir, force_cpu=False):
 
 
 if __name__ == "__main__":
-    input_dir = "/mnt/homeGPU/mcribilles/TFG/nifti_convertidos_anonimizados"
-    output_dir = "./segmentaciones_lung"
+    input_dir = "/mnt/homeGPU/mcribilles/TFG/volumenes/nifti_convertidos_anonimizados"
+    output_dir = "./segmentaciones_lung_and_nodules"
     segmentation_lung_and_nodules(input_dir, output_dir, force_cpu=False)
