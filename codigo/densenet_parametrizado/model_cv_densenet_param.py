@@ -1,4 +1,4 @@
-import os
+import os, time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -22,10 +22,22 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from collections import defaultdict
 
+
 #config
 device = "cuda" if torch.cuda.is_available() else "cpu"
 EPOCHS = 30
 # WEIGHT_DECAY = 1e-5
+
+# Ruta de resultados incremental
+RUN_TAG = time.strftime("%Y%m%d-%H%M%S")
+RESULTS_CSV = f"resultados_modelo_densenet_param_3_masks_{RUN_TAG}.csv"
+
+def append_rows_to_csv(rows, csv_path=RESULTS_CSV):
+    """Escribe filas (lista de dicts) al CSV, añadiendo cabecera solo si no existe."""
+    df_rows = pd.DataFrame(rows)
+    file_exists = os.path.exists(csv_path)
+    df_rows.to_csv(csv_path, mode="a", header=not file_exists, index=False)
+
 
 #leer datos
 df = pd.read_csv("./../clinical_data/clinical_data.csv", na_values="NaN")
@@ -162,82 +174,46 @@ def visualizar_gradcams(model, dataset, val_idx, device, output_base_dir):
 #         return volume, torch.tensor(label, dtype=torch.long)
 
 #dataset with the 3 masks
-class LungCTTripletDataset(Dataset):
+class LungCTTripletNPYDataset(Dataset):
     """
-    Estructura esperada:
-      root_dir/
-        80HXSN/
-          image.nii.gz
-          mask_lung.nii.gz
-          mask_nodule.nii.gz
-          (opcional) meta.json
-        81HXSN/
-          ...
+    root_npy_dir/
+      images/{PID}.npy         -> (D,H,W)
+      masks_lung/{PID}.npy     -> (D,H,W)
+      masks_nodule/{PID}.npy   -> (D,H,W)
     """
-    def __init__(
-        self,
-        root_dir,
-        labels_dict,
-        normalize_hu=(-1000, 400),   # ventana 
-        crop_to_lung=True,            # recorte al bbox del pulmón
-        transform=None
-    ):
-        self.root_dir = root_dir
+    def __init__(self, root_npy_dir, labels_dict, patients=None, transform=None):
+        self.root = root_npy_dir
+        self.images_dir = os.path.join(root_npy_dir, "images")
+        self.lung_dir   = os.path.join(root_npy_dir, "masks_lung")
+        self.nod_dir    = os.path.join(root_npy_dir, "masks_nodule")
         self.labels = labels_dict
-        self.patients = list(labels_dict.keys())
-        self.normalize_hu = normalize_hu
-        self.crop_to_lung = crop_to_lung
+        self.patients = patients if patients is not None else list(labels_dict.keys())
         self.transform = transform
 
-    def __len__(self):
-        return len(self.patients)
+        # Filtra por ficheros existentes
+        self.patients = [pid for pid in self.patients
+                         if all(os.path.exists(os.path.join(d, f"{pid}.npy"))
+                                for d in [self.images_dir, self.lung_dir, self.nod_dir])]
 
-    @staticmethod
-    def _load_nii(path, dtype=None):
-        img = nib.load(path)
-        arr = img.get_fdata()
-        if dtype is not None:
-            arr = arr.astype(dtype)
-        return arr, img.affine, img.header
-
-    def _safe_load_mask(self, case_dir, name, like_shape):
-        p = os.path.join(case_dir, f"{name}.nii.gz")
-        if os.path.exists(p):
-            m, _, _ = self._load_nii(p, dtype=np.uint8)
-            m = (m > 0).astype(np.uint8)
-        else:
-            m = np.zeros(like_shape, dtype=np.uint8)
-        return m
+    def __len__(self): return len(self.patients)
 
     def __getitem__(self, idx):
         pid = self.patients[idx]
-        case_dir = os.path.join(self.root_dir, pid)
+        img  = np.load(os.path.join(self.images_dir, f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+        lung = np.load(os.path.join(self.lung_dir,   f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+        nod  = np.load(os.path.join(self.nod_dir,    f"{pid}.npy")).astype(np.float32)   # (D,H,W)
 
-        #carga imagen y máscaras
-        img, _, _ = self._load_nii(os.path.join(case_dir, "image.nii.gz"), dtype=np.float32)
-        lung = self._safe_load_mask(case_dir, "mask_lung", img.shape)
-        nod  = self._safe_load_mask(case_dir, "mask_nodule", img.shape)
+        # Asegura binarización por si vinieran con valores raros
+        lung = (lung > 0).astype(np.float32)
+        nod  = (nod  > 0).astype(np.float32)
 
-        #  normaliza HU a [0,1] con ventana
-        lo, hi = self.normalize_hu
-        img = np.clip((img - lo) / (hi - lo), 0.0, 1.0).astype(np.float32)
-
-        #recorte por bbox del pulmón (opcional)
-        if self.crop_to_lung and lung.any():
-            zyx = np.array(np.nonzero(lung)).T
-            z0, y0, x0 = zyx.min(0); z1, y1, x1 = zyx.max(0) + 1
-            img  = img[z0:z1, y0:y1, x0:x1]
-            lung = lung[z0:z1, y0:y1, x0:x1]
-            nod  = nod[z0:z1, y0:y1, x0:x1]
-
-        #apila canales: (C, Z, Y, X)
-        vol = np.stack([img, lung.astype(np.float32), nod.astype(np.float32)], axis=0)
+        vol = np.stack([img, lung, nod], axis=0)  # (3,D,H,W)
 
         if self.transform:
-            vol = self.transform(vol) 
-
+            vol = self.transform(vol)
         label = torch.tensor(self.labels[pid], dtype=torch.long)
         return vol, label
+
 
 #transforms
 transform = Compose([EnsureType()])
@@ -419,30 +395,28 @@ def cross_validate(
         val_acc, val_f1, val_tpr, val_tnr, val_gmean = evaluar_modelo(model, val_loader, device)
         test_acc, test_f1, test_tpr, test_tnr, test_gmean = evaluar_modelo(model, test_loader, device)
 
-        results.append({
-            "fold": fold + 1,
-            "set": "VALIDATION",
-            "accuracy": val_acc,
-            "f1": val_f1,
-            "tpr": val_tpr,
-            "tnr": val_tnr,
-            "gmean": val_gmean,
-            "batch_size": batch_size,
-            "learning_rate": learning_rate, 
-            "seed": seed
-        })
-        results.append({
-            "fold": fold + 1,
-            "set": "TEST",
-            "accuracy": test_acc,
-            "f1": test_f1,
-            "tpr": test_tpr,
-            "tnr": test_tnr,
-            "gmean": test_gmean,
-            "batch_size": batch_size,
-            "learning_rate": learning_rate, 
-            "seed": seed
-        })
+        # guardamos incremental por fold
+        row_val = {
+            "fold": fold + 1, "set": "VALIDATION",
+            "accuracy": val_acc, "f1": val_f1, "tpr": val_tpr, "tnr": val_tnr, "gmean": val_gmean,
+            "batch_size": batch_size, "learning_rate": learning_rate,
+            "weight_decay": weight_decay, "dropout_prob": dropout_prob, "seed": seed,
+            "preprocessed_dir": preprocessed_dir
+        }
+        row_test = {
+            "fold": fold + 1, "set": "TEST",
+            "accuracy": test_acc, "f1": test_f1, "tpr": test_tpr, "tnr": test_tnr, "gmean": test_gmean,
+            "batch_size": batch_size, "learning_rate": learning_rate,
+            "weight_decay": weight_decay, "dropout_prob": dropout_prob, "seed": seed,
+            "preprocessed_dir": preprocessed_dir
+        }
+
+        # guardamos las dos filas
+        append_rows_to_csv([row_val, row_test])
+
+        #para luego calcular las medias
+        results.extend([row_val, row_test])
+
 
         # visualizamos gradcam
         gradcam_output_dir = f"gradcam_outputs_param_3_masks_/{preprocessed_dir}/fold_{fold+1}_bs{batch_size}_lr{learning_rate}_seed{seed}"
@@ -465,21 +439,24 @@ def cross_validate(
             "learning_rate": learning_rate, 
             "seed": seed
         }
+        append_rows_to_csv([mean_row])
         results_df = pd.concat([results_df, pd.DataFrame([mean_row])], ignore_index=True)
 
     return results_df
 
 #run grid
 preprocessing_dirs = [
-    "resize_mini_hu_m300_1400_separadas",
-    "resize_mini_hu_m600_1500_separadas"
+    "resize_small_hu_m300_1400_separadas", 
+    "resize_small_hu_m600_1500_separadas",
+    "resize_medium_hu_m300_1400_separadas",
+    "resize_medium_hu_m600_1500_separadas"
 ]
 
-batch_sizes_to_try = [4, 16]
+batch_sizes_to_try = [4, 8, 16, 32]
 learning_rates_to_try = [1e-3]
-weight_decays_to_try = [0]
-dropout_probs_to_try = [0.3]
-seeds_to_try = [8, 40, 123, 777]
+weight_decays_to_try = [0, 1e-5]
+dropout_probs_to_try = [0, 0.3, 0.5]
+seeds_to_try = [8, 9]
 
 
 
@@ -495,11 +472,10 @@ for seed in seeds_to_try:
         print(f"=== PREPROCESADO: {prep} | SEED={seed} ===")
         print("##################################################")
 
-        data_dir = f"/mnt/homeGPU/mcribilles/TFG/volumenes/preprocesados/preprocesamientos_interesantes/{prep}/npy/images"
-        mask_dir = f"/mnt/homeGPU/mcribilles/TFG/volumenes/preprocesados/preprocesamientos_interesantes/{prep}/npy/masks"
-
-        dataset = LungCTDataset(data_dir, mask_dir, labels_dict_numeric, transform=transform)
-
+        base_dir = f"/mnt/homeGPU/mcribilles/tfm/volumenes_preprocesados/{prep}/npy"
+        dataset = LungCTTripletNPYDataset(root_npy_dir=base_dir,
+                                      labels_dict=labels_dict_numeric,
+                                      transform=transform)
         for bs in batch_sizes_to_try:
             for lr in learning_rates_to_try:
                 for weight_decay in weight_decays_to_try:
@@ -519,7 +495,7 @@ for seed in seeds_to_try:
                             k=5,
                             device=device,
                             epochs=EPOCHS,
-                            save_path_prefix=f"modelo_densenet_param_k5_cv_now_solomini_con_otras_seeds_titan_{prep}_bs{bs}_lr{lr}_wd{weight_decay}_drop{dropout_prob}_seed{seed}",
+                            save_path_prefix=f"modelo_densenet_param_3_masks_{prep}_bs{bs}_lr{lr}_wd{weight_decay}_drop{dropout_prob}_seed{seed}",
                             weight_decay=weight_decay,
                             dropout_prob=dropout_prob,
                             seed=seed  
@@ -532,5 +508,5 @@ for seed in seeds_to_try:
                         all_results.append(df_result)
 
 final_results = pd.concat(all_results, ignore_index=True)
-final_results.to_csv("resultados_param_k5_final_solomini_con_otras_seeds_titan.csv", index=False)
-print("\n Todos los resultados guardados en 'resultados_param_k5_final_solomini_con_otras_seeds_titan.csv'")
+final_results.to_csv("resultados_modelo_densenet_param_3_masks.csv", index=False)
+print("\n Todos los resultados guardados en 'resultados_param_3_masks.csv'")
