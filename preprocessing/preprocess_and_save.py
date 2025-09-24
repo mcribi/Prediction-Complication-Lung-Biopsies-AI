@@ -44,6 +44,8 @@ from monai.data import Dataset as MonaiDictDataset
 # Transforms base (3 canales: imagen, pulmón, nódulo)
 target_small  = (128, 256, 256)
 target_medium = (256, 512, 512)
+target_cube64  = (64, 64, 64)
+target_cube128 = (128, 128, 128)
 
 def make_transforms(spatial_size, add_windowing=None):
     """
@@ -137,43 +139,92 @@ def run_preprocessing_configs_triplet(root_dir_cases, patient_ids, output_base_d
 
 # configs
 configs = {
-    "resize_small": {
-        "transforms": make_transforms(target_small),
+    # "resize_small": {
+    #     "transforms": make_transforms(target_small),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+    # "resize_small_hu_m600_1500_separadas": {
+    #     "transforms": make_transforms(target_small, add_windowing=("single",-600,1500)),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+    # "resize_small_hu_m300_1400_separadas": {
+    #     "transforms": make_transforms(target_small, add_windowing=("single",-300,1400)),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+    # "resize_small_multiwindowing_separadas": {
+    #     "transforms": make_transforms(target_small, add_windowing=("multi",[(-600,1500),(40,400),(-160,600)])),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,  #True si quieres (C=3) en combined
+    # },
+    # "resize_medium": {
+    #     "transforms": make_transforms(target_medium),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+    # "resize_medium_hu_m600_1500_separadas": {
+    #     "transforms": make_transforms(target_medium, add_windowing=("single",-600,1500)),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+    # "resize_medium_hu_m300_1400_separadas": {
+    #     "transforms": make_transforms(target_medium, add_windowing=("single",-300,1400)),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+    # "resize_medium_multiwindowing_separadas": {
+    #     "transforms": make_transforms(target_medium, add_windowing=("multi",[(-600,1500),(40,400),(-160,600)])),
+    #     "save_format": ["npy","nifti"],
+    #     "save_combined": False,
+    # },
+
+    "resize_cube64": {
+        "transforms": make_transforms(target_cube64),
         "save_format": ["npy","nifti"],
         "save_combined": False,
     },
-    "resize_small_hu_m600_1500_separadas": {
-        "transforms": make_transforms(target_small, add_windowing=("single",-600,1500)),
+
+    "resize_cube64_hu_m600_1500": {
+    "transforms": make_transforms(target_cube64, add_windowing=("single",-600,1500)),
+    "save_format": ["npy","nifti"],
+    "save_combined": False,
+    },
+
+    "resize_cube64_hu_m300_1400": {
+    "transforms": make_transforms(target_cube64, add_windowing=("single",-300,1400)),
+    "save_format": ["npy","nifti"],
+    "save_combined": False,
+    },
+
+    "resize_cube64_multiwindowing_separadas": {
+        "transforms": make_transforms(target_cube64, add_windowing=("multi",[(-600,1500),(40,400),(-160,600)])),
         "save_format": ["npy","nifti"],
         "save_combined": False,
     },
-    "resize_small_hu_m300_1400_separadas": {
-        "transforms": make_transforms(target_small, add_windowing=("single",-300,1400)),
+
+    "resize_cube128": {
+        "transforms": make_transforms(target_cube128),
         "save_format": ["npy","nifti"],
         "save_combined": False,
     },
-    "resize_small_multiwindowing_separadas": {
-        "transforms": make_transforms(target_small, add_windowing=("multi",[(-600,1500),(40,400),(-160,600)])),
-        "save_format": ["npy","nifti"],
-        "save_combined": False,  #True si quieres (C=3) en combined
+
+    "resize_cube128_hu_m600_1500": {
+    "transforms": make_transforms(target_cube128, add_windowing=("single",-600,1500)),
+    "save_format": ["npy","nifti"],
+    "save_combined": False,
     },
-    "resize_medium": {
-        "transforms": make_transforms(target_medium),
-        "save_format": ["npy","nifti"],
-        "save_combined": False,
+
+
+    "resize_cube128_hu_m300_1400": {
+    "transforms": make_transforms(target_cube128, add_windowing=("single",-300,1400)),
+    "save_format": ["npy","nifti"],
+    "save_combined": False,
     },
-    "resize_medium_hu_m600_1500_separadas": {
-        "transforms": make_transforms(target_medium, add_windowing=("single",-600,1500)),
-        "save_format": ["npy","nifti"],
-        "save_combined": False,
-    },
-    "resize_medium_hu_m300_1400_separadas": {
-        "transforms": make_transforms(target_medium, add_windowing=("single",-300,1400)),
-        "save_format": ["npy","nifti"],
-        "save_combined": False,
-    },
-    "resize_medium_multiwindowing_separadas": {
-        "transforms": make_transforms(target_medium, add_windowing=("multi",[(-600,1500),(40,400),(-160,600)])),
+
+    "resize_cube128_multiwindowing_separadas": {
+        "transforms": make_transforms(target_cube128, add_windowing=("multi",[(-600,1500),(40,400),(-160,600)])),
         "save_format": ["npy","nifti"],
         "save_combined": False,
     },

@@ -15,7 +15,7 @@ from monai.networks.nets import DenseNet121
 from monai.transforms import Compose, EnsureType
 
 from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, roc_auc_score
 
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
@@ -174,14 +174,109 @@ def visualizar_gradcams(model, dataset, val_idx, device, output_base_dir):
 #         return volume, torch.tensor(label, dtype=torch.long)
 
 #dataset with the 3 masks
-class LungCTTripletNPYDataset(Dataset):
+# class LungCTTripletNPYDataset(Dataset):
+#     """
+#     root_npy_dir/
+#       images/{PID}.npy         -> (D,H,W)
+#       masks_lung/{PID}.npy     -> (D,H,W)
+#       masks_nodule/{PID}.npy   -> (D,H,W)
+#     """
+#     def __init__(self, root_npy_dir, labels_dict, patients=None, transform=None):
+#         self.root = root_npy_dir
+#         self.images_dir = os.path.join(root_npy_dir, "images")
+#         self.lung_dir   = os.path.join(root_npy_dir, "masks_lung")
+#         self.nod_dir    = os.path.join(root_npy_dir, "masks_nodule")
+#         self.labels = labels_dict
+#         self.patients = patients if patients is not None else list(labels_dict.keys())
+#         self.transform = transform
+
+#         # Filtra por ficheros existentes
+#         self.patients = [pid for pid in self.patients
+#                          if all(os.path.exists(os.path.join(d, f"{pid}.npy"))
+#                                 for d in [self.images_dir, self.lung_dir, self.nod_dir])]
+
+#     def __len__(self): return len(self.patients)
+
+#     def __getitem__(self, idx):
+#         pid = self.patients[idx]
+#         img  = np.load(os.path.join(self.images_dir, f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+#         lung = np.load(os.path.join(self.lung_dir,   f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+#         nod  = np.load(os.path.join(self.nod_dir,    f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+
+#         # Asegura binarización por si vinieran con valores raros
+#         lung = (lung > 0).astype(np.float32)
+#         nod  = (nod  > 0).astype(np.float32)
+
+#         vol = np.stack([img, lung, nod], axis=0)  # (3,D,H,W)
+
+#         if self.transform:
+#             vol = self.transform(vol)
+#         label = torch.tensor(self.labels[pid], dtype=torch.long)
+#         return vol, label
+
+# class LungCTTripletNPYDataset(Dataset):
+#     """
+#     root_npy_dir/
+#       images/{PID}.npy         -> (D,H,W)  imagen ya windowed/normalizada [0,1] en el preprocesado
+#       masks_lung/{PID}.npy     -> (D,H,W)  binaria {0,1}
+#       masks_nodule/{PID}.npy   -> (D,H,W)  binaria {0,1}
+#     """
+#     def __init__(self, root_npy_dir, labels_dict, patients=None, transform=None):
+#         self.root = root_npy_dir
+#         self.images_dir = os.path.join(root_npy_dir, "images")
+#         self.lung_dir   = os.path.join(root_npy_dir, "masks_lung")
+#         self.nod_dir    = os.path.join(root_npy_dir, "masks_nodule")
+#         self.labels = labels_dict
+#         self.patients = patients if patients is not None else list(labels_dict.keys())
+#         self.transform = transform
+
+#         # Filtra por ficheros existentes
+#         self.patients = [pid for pid in self.patients
+#                          if all(os.path.exists(os.path.join(d, f"{pid}.npy"))
+#                                 for d in [self.images_dir, self.lung_dir, self.nod_dir])]
+
+#     def __len__(self): 
+#         return len(self.patients)
+
+#     def __getitem__(self, idx):
+#         pid = self.patients[idx]
+#         # Carga
+#         img  = np.load(os.path.join(self.images_dir, f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+#         lung = np.load(os.path.join(self.lung_dir,   f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+#         nod  = np.load(os.path.join(self.nod_dir,    f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+
+#         # Asegura binarización
+#         lung = (lung > 0.5).astype(np.float32)
+#         nod  = (nod  > 0.5).astype(np.float32)
+
+#         # Canal 0: imagen enmascarada por pulmón (fuera del pulmón = 0)
+#         img_masked = img * lung
+
+#         # Apila canales: (3, D, H, W)
+#         vol = np.stack([img_masked, lung, nod], axis=0).astype(np.float32)
+
+#         # MONAI transform
+#         if self.transform:
+#             vol = self.transform(vol)
+
+#         label = torch.tensor(self.labels[pid], dtype=torch.long)
+#         return vol, label
+
+
+#solo 1 canal reforzando la parte del nodulo
+class LungCTMaskedNPYDataset(Dataset):
     """
     root_npy_dir/
-      images/{PID}.npy         -> (D,H,W)
-      masks_lung/{PID}.npy     -> (D,H,W)
-      masks_nodule/{PID}.npy   -> (D,H,W)
+      images/{PID}.npy         -> (D,H,W)  imagen windowed/normalizada [0,1] en preprocesado
+      masks_lung/{PID}.npy     -> (D,H,W)  binaria {0,1}
+      masks_nodule/{PID}.npy   -> (D,H,W)  binaria {0,1}
     """
-    def __init__(self, root_npy_dir, labels_dict, patients=None, transform=None):
+    def __init__(self, root_npy_dir, labels_dict, patients=None, transform=None,
+                 emphasize_nodule=False, nodule_gain=0.0):
+        """
+        emphasize_nodule: si True, multiplica intensidades intrapulmonares por (1 + nodule_gain*mask_nodule)
+        nodule_gain:     0.0 -> sin énfasis;  por ejemplo 0.2 ó 0.5 para realzar nódulo
+        """
         self.root = root_npy_dir
         self.images_dir = os.path.join(root_npy_dir, "images")
         self.lung_dir   = os.path.join(root_npy_dir, "masks_lung")
@@ -189,51 +284,66 @@ class LungCTTripletNPYDataset(Dataset):
         self.labels = labels_dict
         self.patients = patients if patients is not None else list(labels_dict.keys())
         self.transform = transform
+        self.emphasize_nodule = emphasize_nodule
+        self.nodule_gain = float(nodule_gain)
 
         # Filtra por ficheros existentes
         self.patients = [pid for pid in self.patients
                          if all(os.path.exists(os.path.join(d, f"{pid}.npy"))
                                 for d in [self.images_dir, self.lung_dir, self.nod_dir])]
 
-    def __len__(self): return len(self.patients)
+    def __len__(self): 
+        return len(self.patients)
 
     def __getitem__(self, idx):
-        pid = self.patients[idx]
-        img  = np.load(os.path.join(self.images_dir, f"{pid}.npy")).astype(np.float32)   # (D,H,W)
-        lung = np.load(os.path.join(self.lung_dir,   f"{pid}.npy")).astype(np.float32)   # (D,H,W)
-        nod  = np.load(os.path.join(self.nod_dir,    f"{pid}.npy")).astype(np.float32)   # (D,H,W)
+        pid  = self.patients[idx]
+        img  = np.load(os.path.join(self.images_dir, f"{pid}.npy")).astype(np.float32)   # (D,H,W) en [0,1]
+        lung = np.load(os.path.join(self.lung_dir,   f"{pid}.npy")).astype(np.float32)
+        nod  = np.load(os.path.join(self.nod_dir,    f"{pid}.npy")).astype(np.float32)
 
-        # Asegura binarización por si vinieran con valores raros
-        lung = (lung > 0).astype(np.float32)
-        nod  = (nod  > 0).astype(np.float32)
+        lung = (lung > 0.5).astype(np.float32)
+        nod  = (nod  > 0.5).astype(np.float32)
 
-        vol = np.stack([img, lung, nod], axis=0)  # (3,D,H,W)
+        # 1) Enmascara como antes: solo intrapulmonar
+        img_masked = img * lung
+
+        # 2) realza ligeramente el nódulo, sin anular el resto del pulmón
+        if self.emphasize_nodule and self.nodule_gain > 0.0:
+            # factor = 1 fuera del nódulo; 1 + gain dentro del nódulo (siempre dentro del pulmón)
+            factor = 1.0 + self.nodule_gain * nod
+            img_masked = img_masked * factor
+            # re-clip por si sube de 1.0
+            img_masked = np.clip(img_masked, 0.0, 1.0)
+
+        # Salida 1 canal: (1, D, H, W)
+        vol = img_masked[None, ...].astype(np.float32)
 
         if self.transform:
             vol = self.transform(vol)
-        label = torch.tensor(self.labels[pid], dtype=torch.long)
-        return vol, label
+
+        y = torch.tensor(self.labels[pid], dtype=torch.long)
+        return vol, y
 
 
 #transforms
 transform = Compose([EnsureType()])
 
 #modelo
-# def build_model(dropout_prob):
-#     return DenseNet121(
-#         spatial_dims=3,
-#         in_channels=1,
-#         out_channels=2,
-#         dropout_prob=dropout_prob
-#     )
-
 def build_model(dropout_prob):
     return DenseNet121(
         spatial_dims=3,
-        in_channels=3,   #ahora tenemos 3 canales(imagen, pulmón, nódulo)
+        in_channels=1,
         out_channels=2,
         dropout_prob=dropout_prob
     )
+
+# def build_model(dropout_prob):
+#     return DenseNet121(
+#         spatial_dims=3,
+#         in_channels=3,   #ahora tenemos 3 canales(imagen, pulmón, nódulo)
+#         out_channels=2,
+#         dropout_prob=dropout_prob
+#     )
 
 # train
 def train_model_with_internal_validation(
@@ -316,20 +426,31 @@ def calcular_metricas_binarias(y_true, y_pred):
 
 def evaluar_modelo(model, data_loader, device):
     model.eval()
-    all_preds, all_labels = [], []
+    all_preds, all_labels, all_probs = [], [], []
 
     with torch.no_grad():
         for inputs, labels in data_loader:
             inputs = inputs.to(device)
-            outputs = model(inputs)
+            outputs = model(inputs)                      # (N,2)
+            probs = torch.softmax(outputs, dim=1)[:, 1]  # prob clase positiva
             preds = torch.argmax(outputs, dim=1).cpu().numpy()
+
+            all_probs.extend(probs.cpu().numpy())
             all_preds.extend(preds)
             all_labels.extend(labels.cpu().numpy())
 
     acc = accuracy_score(all_labels, all_preds)
     f1 = f1_score(all_labels, all_preds)
     tpr, tnr, gmean = calcular_metricas_binarias(all_labels, all_preds)
-    return acc, f1, tpr, tnr, gmean
+
+    # AUC puede fallar si solo hay una clase en y_true
+    try:
+        auc = roc_auc_score(all_labels, all_probs)
+    except ValueError:
+        auc = float("nan")
+
+    return acc, f1, tpr, tnr, gmean, auc
+
 
 #cv
 def cross_validate(
@@ -341,7 +462,7 @@ def cross_validate(
     k=5,
     device='cuda',
     epochs=10,
-    save_path_prefix="modelo_densenet_param_3_masks_", 
+    save_path_prefix="modelo_densenet_param_1_mask_reforzando_nodulo_", 
     weight_decay=1e-5,
     dropout_prob=0.4, 
     seed=42
@@ -392,24 +513,28 @@ def cross_validate(
 
         # evaluacion final en validacion (mejor modelo)
         model.load_state_dict(torch.load(save_path))
-        val_acc, val_f1, val_tpr, val_tnr, val_gmean = evaluar_modelo(model, val_loader, device)
-        test_acc, test_f1, test_tpr, test_tnr, test_gmean = evaluar_modelo(model, test_loader, device)
+        val_acc, val_f1, val_tpr, val_tnr, val_gmean, val_auc = evaluar_modelo(model, val_loader, device)
+        test_acc, test_f1, test_tpr, test_tnr, test_gmean, test_auc = evaluar_modelo(model, test_loader, device)
+
 
         # guardamos incremental por fold
         row_val = {
             "fold": fold + 1, "set": "VALIDATION",
-            "accuracy": val_acc, "f1": val_f1, "tpr": val_tpr, "tnr": val_tnr, "gmean": val_gmean,
+            "accuracy": val_acc, "f1": val_f1, "tpr": val_tpr, "tnr": val_tnr,
+            "gmean": val_gmean, "auc": val_auc,
             "batch_size": batch_size, "learning_rate": learning_rate,
             "weight_decay": weight_decay, "dropout_prob": dropout_prob, "seed": seed,
             "preprocessed_dir": preprocessed_dir
         }
         row_test = {
             "fold": fold + 1, "set": "TEST",
-            "accuracy": test_acc, "f1": test_f1, "tpr": test_tpr, "tnr": test_tnr, "gmean": test_gmean,
+            "accuracy": test_acc, "f1": test_f1, "tpr": test_tpr, "tnr": test_tnr,
+            "gmean": test_gmean, "auc": test_auc,
             "batch_size": batch_size, "learning_rate": learning_rate,
             "weight_decay": weight_decay, "dropout_prob": dropout_prob, "seed": seed,
             "preprocessed_dir": preprocessed_dir
         }
+
 
         # guardamos las dos filas
         append_rows_to_csv([row_val, row_test])
@@ -419,45 +544,57 @@ def cross_validate(
 
 
         # visualizamos gradcam
-        gradcam_output_dir = f"gradcam_outputs_param_3_masks_/{preprocessed_dir}/fold_{fold+1}_bs{batch_size}_lr{learning_rate}_seed{seed}"
+        gradcam_output_dir = f"gradcam_outputs_param_1_mask_reforzando_nodulo_/{preprocessed_dir}/fold_{fold+1}_bs{batch_size}_lr{learning_rate}_seed{seed}"
         visualizar_gradcams(model, dataset, test_idx, device, gradcam_output_dir)
 
     results_df = pd.DataFrame(results)
 
     # añadimos medias
     for split in ["VALIDATION", "TEST"]:
-        means = results_df[results_df["set"] == split][["accuracy", "f1", "tpr", "tnr", "gmean"]].mean()
+        means = results_df[results_df["set"] == split][["accuracy","f1","tpr","tnr","gmean","auc"]].mean()
         mean_row = {
-            "fold": "MEAN",
-            "set": split,
-            "accuracy": means["accuracy"],
-            "f1": means["f1"],
-            "tpr": means["tpr"],
-            "tnr": means["tnr"],
-            "gmean": means["gmean"],
-            "batch_size": batch_size,
-            "learning_rate": learning_rate, 
+            "fold": "MEAN", "set": split,
+            "accuracy": means["accuracy"], "f1": means["f1"],
+            "tpr": means["tpr"], "tnr": means["tnr"],
+            "gmean": means["gmean"], "auc": means["auc"],
+            "batch_size": batch_size, "learning_rate": learning_rate,
             "seed": seed
         }
         append_rows_to_csv([mean_row])
         results_df = pd.concat([results_df, pd.DataFrame([mean_row])], ignore_index=True)
 
+
     return results_df
 
 #run grid
 preprocessing_dirs = [
-    "resize_small_hu_m300_1400_separadas", 
+    "resize_small_hu_m300_1400_separadas",
     "resize_small_hu_m600_1500_separadas",
-    "resize_medium_hu_m300_1400_separadas",
-    "resize_medium_hu_m600_1500_separadas"
+    # "resize_medium_hu_m300_1400_separadas", #son demasiado grandes, da out of memory
+    # "resize_medium_hu_m600_1500_separadas"
+    "resize_cube64_hu_m600_1500", 
+    "resize_cube64_hu_m300_1400", 
+    "resize_cube128_hu_m600_1500",
+    "resize_cube128_hu_m300_1400"
 ]
 
-batch_sizes_to_try = [4, 8, 16, 32]
+
 learning_rates_to_try = [1e-3]
 weight_decays_to_try = [0, 1e-5]
 dropout_probs_to_try = [0, 0.3, 0.5]
 seeds_to_try = [8, 9]
 
+#batch_sizes_to_try = [4, 8] #16 y 32 dan out of memory en small y medium
+
+def bs_list_for(prep: str):
+    # small:  solo 4 y 8 (si no out of memory)
+    if "resize_small_" in prep:
+        return [4, 8]
+    # cubos 64/128: permitir también 16 y 32
+    if "resize_cube64" in prep or "resize_cube128" in prep:
+        return [4, 8, 16, 32]
+    # fallback para otros (ej medium)
+    return [4, 8]
 
 
 all_results = []
@@ -473,10 +610,17 @@ for seed in seeds_to_try:
         print("##################################################")
 
         base_dir = f"/mnt/homeGPU/mcribilles/tfm/volumenes_preprocesados/{prep}/npy"
-        dataset = LungCTTripletNPYDataset(root_npy_dir=base_dir,
-                                      labels_dict=labels_dict_numeric,
-                                      transform=transform)
-        for bs in batch_sizes_to_try:
+        # dataset = LungCTTripletNPYDataset(root_npy_dir=base_dir,
+        #                               labels_dict=labels_dict_numeric,
+        #                               transform=transform)
+        dataset = LungCTMaskedNPYDataset(
+            root_npy_dir=base_dir,
+            labels_dict=labels_dict_numeric,
+            transform=transform,
+            emphasize_nodule=True,   
+            nodule_gain=0.4          #ir probando de 0.2 a 0.5
+        )
+        for bs in bs_list_for(prep):
             for lr in learning_rates_to_try:
                 for weight_decay in weight_decays_to_try:
                     for dropout_prob in dropout_probs_to_try:
@@ -495,7 +639,7 @@ for seed in seeds_to_try:
                             k=5,
                             device=device,
                             epochs=EPOCHS,
-                            save_path_prefix=f"modelo_densenet_param_3_masks_{prep}_bs{bs}_lr{lr}_wd{weight_decay}_drop{dropout_prob}_seed{seed}",
+                            save_path_prefix=f"modelo_densenet_param_1_mask_reforzando_nodulo_{prep}_bs{bs}_lr{lr}_wd{weight_decay}_drop{dropout_prob}_seed{seed}",
                             weight_decay=weight_decay,
                             dropout_prob=dropout_prob,
                             seed=seed  
@@ -508,5 +652,5 @@ for seed in seeds_to_try:
                         all_results.append(df_result)
 
 final_results = pd.concat(all_results, ignore_index=True)
-final_results.to_csv("resultados_modelo_densenet_param_3_masks.csv", index=False)
-print("\n Todos los resultados guardados en 'resultados_param_3_masks.csv'")
+final_results.to_csv("resultados_modelo_densenet_param_1_mask_reforzando_nodulo.csv", index=False)
+print("\n Todos los resultados guardados en 'resultados_modelo_densenet_param_1_mask_reforzando_nodulo.csv'")
