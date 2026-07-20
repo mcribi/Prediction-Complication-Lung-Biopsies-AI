@@ -1,0 +1,127 @@
+# =============================================
+# TFM - datos sensibles, artefactos pesados y outputs regenerables
+# Mantener trackeado solo codigo, documentacion y configs.
+# =============================================
+
+# --- Datos clinicos y dataset sensible ---
+/clinical_data/
+/codigo/data/
+/codigo/datasets/
+
+# --- Volumenes medicos originales o preprocesados ---
+/volumenes_preprocesados/
+/volumenes_fisura_incompleta/
+*.nii
+*.nii.gz
+*.mha
+*.mhd
+*.nrrd
+*.dcm
+
+# --- Segmentaciones e imagenes derivadas sensibles ---
+/segmentation/segmentaciones_lung_and_nodules/
+/segmentation/segmentaciones_lung_and_nodules_vessels_bronquia/
+/segmentation/segmentacion_vessels/
+
+# --- Pesos de modelos y checkpoints ---
+/tabpfn_models/
+/codigo/models/
+/codigo/modelos_pesos/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.joblib
+*.pkl
+*.pickle
+
+# --- Runs, predicciones y outputs regenerables ---
+/slurm_outputs/
+**/slurm_outputs/
+*.out
+*.err
+
+/codigo/grad_cam/
+/codigo/gradcam_outputs*/
+/codigo/*gradcam_outputs*/
+/codigo/resnet_resultados/
+/codigo/resultados_provisionales/
+/codigo/radiomic_results/
+/codigo/radiomica/results/
+/codigo/radiomica/test_run/
+/codigo/radiomica/test_run_extended_only/
+/codigo/radiomica/test_run_full/
+/codigo/DL_multietiqueta/phase_a_single_job_runs/
+/codigo/DL_multietiqueta/val_externa_interna/runs/
+/codigo/DL_multietiqueta/**/runs/
+/codigo/DL_multietiqueta/**/posthoc_gradcam_outputs*/
+/codigo/DL_multietiqueta/**/gradcam_smoke_validate/
+
+# --- Derivados tabulares regenerables ---
+/preprocessing/preproc_qc_report.csv
+
+# --- Dependencias locales / caches ---
+/pyradiomics/
+**/__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# --- Backups y temporales ---
+*.bak
+*.bak_*
+*~
+.tmp
+/tmp_probe_*
+
+# --- Entornos  ---
+.env
+.venv/
+venv/
+
+# --- Sistema operativo / editores ---
+.DS_Store
+Thumbs.db
+
+# --- Radiomica multietiqueta: outputs regenerables ---
+/codigo/radiomica_multietiqueta/radiomica_grids/
+/codigo/radiomica_multietiqueta/radiomica_preprocessed_batches/
+/codigo/radiomica_multietiqueta/radiomica_runs/
+/codigo/radiomica_multietiqueta/radiomic_results/
+/codigo/radiomica_multietiqueta/radiomic_results_smoke/
+/codigo/radiomica_multietiqueta/radiomic_results_smoke_slurm/
+
+# --- Clasificacion binaria: pesos regenerables ---
+/codigo/clasif_binaria/modelos_pesos/
+
+# --- EDA DICOM: metadatos derivados sensibles ---
+/codigo/eda/dicom_*.csv
+
+codigo/clasif_binaria/models/
+codigo/clasif_binaria/grad_cam_antiguos/
+
+/codigo/CIP/
+
+gitignore
+#Datos y resultados de clasificacion binaria
+/codigo/clasif_binaria/data/
+codigo/clasif_binaria/radiomic_results_clasif_binaria/sqlite_fixed/results_radiomics.db
+/codigo/clasif_binaria/config/valid_configurations.HUGE.json
+codigo/clasif_binaria/config/valid_configurations.HUGE.json
+/codigo/clasif_binaria/radiomic_results_clasif_binaria/
+/codigo/clasif_binaria/radiomica_clasif_binaria/results/
+/codigo/clasif_binaria/radiomica_clasif_binaria/test_run*/
+/codigo/clasif_binaria/resnet_resultados/
+/codigo/clasif_binaria/resultados_clasif_binaria/
+
+#Configuraciones masivas regenerables
+/codigo/clasif_binaria/radiomica_clasif_binaria/valid_configurations.json
+/codigo/clasif_binaria/radiomica_clasif_binaria/valid_configurations_radiomics.json
+/codigo/clasif_binaria/radiomica_clasif_binaria/valid_configurations_radiomics_fixed.json
+
+#Derivados potencialmente sensibles
+/codigo/subgroup_discovery/*.csv
+/codigo/fisura_incompleta_pulmonar/fisuras_flags.csv
+
+#Historial local
+.Rhistory
+

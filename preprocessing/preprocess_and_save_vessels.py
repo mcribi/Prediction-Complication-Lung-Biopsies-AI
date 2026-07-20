@@ -37,6 +37,117 @@ def build_items_list_triplet(root_dir, patient_dirnames):
             items.append({"image": img, "mask_lung": lung, "mask_nodule": nod, "pid": pid})
     return items
 
+def build_items_list_vessels(root_dir, patient_dirnames):
+    """
+    Espera carpetas del tipo {pid}_vessels con:
+      lung_trachea_bronchia.nii.gz
+      lung_vessels.nii.gz
+    """
+    items = []
+    for dirname in patient_dirnames:
+        if not dirname.endswith("_vessels"):
+            continue
+        pid = dirname[:-8]  # quita "_vessels"
+        case_dir = os.path.join(root_dir, dirname)
+        trachea = os.path.join(case_dir, "lung_trachea_bronchia.nii.gz")
+        vessels = os.path.join(case_dir, "lung_vessels.nii.gz")
+        if all(os.path.exists(p) for p in [trachea, vessels]):
+            items.append({
+                "mask_trachea": trachea,
+                "mask_vessels": vessels,
+                "pid": pid
+            })
+    return items
+
+
+
+def make_vessels_transforms(spatial_size):
+    """
+    Mismas operaciones geométricas que el resto (Transpose, Resize)
+    pero solo para máscaras de tráquea/bronquios y vasos.
+    """
+    return Compose([
+        LoadImaged(keys=["mask_trachea", "mask_vessels"]),
+        EnsureChannelFirstd(keys=["mask_trachea", "mask_vessels"]),
+        TransposeD(keys=["mask_trachea", "mask_vessels"], indices=(0, 3, 1, 2)),  # -> (1,D,H,W)
+        ResizeD(keys=["mask_trachea", "mask_vessels"], spatial_size=spatial_size, mode="nearest"),
+        ToTensord(keys=["mask_trachea", "mask_vessels"]),
+    ])
+
+
+def spatial_size_from_conf_name(conf_name):
+    """
+    Usamos las mismas reglas que tus configs:
+      - "small"   -> target_small
+      - "medium"  -> target_medium
+      - "cube64"  -> target_cube64
+      - "cube128" -> target_cube128
+    """
+    if "cube128" in conf_name:
+        return target_cube128
+    if "cube64" in conf_name:
+        return target_cube64
+    if "medium" in conf_name:
+        return target_medium
+    # por defecto "small"
+    return target_small
+
+
+
+def run_preprocessing_configs_vessels(root_dir_cases, patient_ids, output_base_dir, configs_base):
+    """
+    Recorre las MISMAS configs que el triplete (mismos nombres de carpeta)
+    pero usando transforms específicos de vessels.
+    """
+    items = build_items_list_vessels(root_dir_cases, patient_ids)
+    print(f"Encontrados {len(items)} casos de vessels válidos en {root_dir_cases}")
+
+    for conf_name, conf in configs_base.items():
+        print(f"\n>>> Config (vessels): {conf_name}")
+        spatial_size = spatial_size_from_conf_name(conf_name)
+        tfm = make_vessels_transforms(spatial_size)
+
+        save_formats = conf.get("save_format", ["npy"])
+        if isinstance(save_formats, str):
+            save_formats = [save_formats]
+
+        ds = MonaiDictDataset(data=items, transform=tfm)
+
+        for i in tqdm(range(len(ds)), desc=f"[vessels_{conf_name}]"):
+            try:
+                sample = ds[i]
+                pid = items[i]["pid"]
+
+                trachea = to_numpy(sample["mask_trachea"])   # (1,D,H,W)
+                vessels = to_numpy(sample["mask_vessels"])   # (1,D,H,W)
+
+                for fmt in save_formats:
+                    base = os.path.join(output_base_dir, conf_name, fmt)
+
+                    # affine desde la mask de tráquea (como referencia)
+                    meta = sample.get("mask_trachea_meta_dict", None)
+                    aff = None
+                    if meta is not None:
+                        aff = meta.get("affine", None)
+                    if aff is None:
+                        aff = nib.load(items[i]["mask_trachea"]).affine
+
+                    out_tr = os.path.join(base, "masks_trachea_bronchia", pid)
+                    out_vs = os.path.join(base, "masks_vessels", pid)
+
+                    if fmt == "npy":
+                        save_npy(out_tr, trachea.squeeze())
+                        save_npy(out_vs, vessels.squeeze())
+                    else:
+                        save_nifti(out_tr, trachea.squeeze().astype(np.uint8), aff)
+                        save_nifti(out_vs, vessels.squeeze().astype(np.uint8), aff)
+
+            except Exception:
+                print(f" Error en {items[i]['pid']} (vessels)")
+                traceback.print_exc()
+
+
+
 
 
 from monai.data import Dataset as MonaiDictDataset
@@ -232,8 +343,24 @@ configs = {
 
 # main
 if __name__ == "__main__":
-    #root_cases = "/mnt/homeGPU/mcribilles/tfm/segmentation/segmentacion_vessels/nuevos17dic25/"
-    root_cases= " /mnt/homeGPU/mcribilles/TFG/segmentacion/segmentaciones_nodulos/nuevos17dic25/"
-    patient_dirnames = sorted(os.listdir(root_cases)) 
-    out_base = "./../volumenes_preprocesados/nuevos17dic25/"
-    run_preprocessing_configs_triplet(root_cases, patient_dirnames, out_base, configs)
+    out_base = "./../volumenes_preprocesados/"
+
+    # Solo queremos procesar vessels y tráquea, las imágenes ya están hechas
+    root_cases_vessels = "/mnt/homeGPU/mcribilles/tfm/segmentation/segmentacion_vessels/"
+    patient_dirnames_v = sorted(os.listdir(root_cases_vessels))
+
+    # Si quieres usar TODAS las configs que ya tenías:
+    configs_for_vessels = configs
+
+    # Si solo quieres, por ejemplo, resize_small_hu_m300_1400:
+    # configs_for_vessels = {
+    #     k: v for k, v in configs.items()
+    #     if k in ["resize_small_hu_m300_1400"]
+    # }
+
+    run_preprocessing_configs_vessels(
+        root_dir_cases=root_cases_vessels,
+        patient_ids=patient_dirnames_v,
+        output_base_dir=out_base,
+        configs_base=configs_for_vessels
+    )

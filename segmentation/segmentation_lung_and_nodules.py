@@ -29,6 +29,6 @@ def segmentation_lung_and_nodules(input_dir, output_dir, force_cpu=False):
 
 
 if __name__ == "__main__":
-    input_dir = "/mnt/homeGPU/mcribilles/TFG/volumenes/faltantes"
-    output_dir = "./segmentaciones_lung_and_nodules"
+    input_dir = "/mnt/homeGPU/mcribilles/TFG/volumenes/nifti_convertidos_anonimizados/nuevos17dic25/"
+    output_dir = "/mnt/homeGPU/mcribilles/TFG/segmentacion/segmentaciones_nodulos/nuevos17dic25/"
     segmentation_lung_and_nodules(input_dir, output_dir, force_cpu=False)
