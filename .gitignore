@@ -125,3 +125,21 @@ codigo/clasif_binaria/config/valid_configurations.HUGE.json
 #Historial local
 .Rhistory
 
+# --- Actualizacion segura ngpu 2026-08: datos externos, temporales y outputs DL/SD ---
+/external_data/
+/tmp_downloads/
+/tmp_*.py
+
+/codigo/DL_multietiqueta/multimodal_multietiqueta/runs/
+/codigo/DL_multietiqueta/multimodal_multietiqueta/__pycache__/
+/codigo/DL_multietiqueta/multimodal_multietiqueta/.patch_*.py
+
+/codigo/DL_multietiqueta/pretrained_finetuning/runs/
+/codigo/DL_multietiqueta/pretrained_finetuning/external/
+/codigo/DL_multietiqueta/pretrained_finetuning/**/__pycache__/
+/codigo/DL_multietiqueta/pretrained_finetuning/rescue_20260728_pretraining_strategy/03_luna_lidc_domain_pretraining/luna16_patch_index/
+/codigo/DL_multietiqueta/pretrained_finetuning/rescue_20260728_pretraining_strategy/03_luna_lidc_domain_pretraining/preflight_report.json
+
+/codigo/subgroup_discovery/results/
+/codigo/subgroup_discovery/preliminar/
+/codigo/subgroup_discovery/**/__pycache__/

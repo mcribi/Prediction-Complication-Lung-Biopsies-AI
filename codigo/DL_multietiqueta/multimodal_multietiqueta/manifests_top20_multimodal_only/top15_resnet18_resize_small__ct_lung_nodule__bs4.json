@@ -1,0 +1,30 @@
+{
+  "selection_scope": "top complete image-only 3D configurations from val_externa_interna/runs",
+  "selection_metric": "oof_f1_micro on test_outer",
+  "selection_direction": "maximize",
+  "selection_rank": 15,
+  "selection_status": "retrospective_exploratory",
+  "selection_warning": "The outer-test metric was used for configuration selection. New multimodal outer-test results are therefore exploratory and not an unbiased confirmatory estimate.",
+  "selected_model": "resnet18",
+  "selected_preprocessing": "resize_small",
+  "selected_input_name": "ct_lung_nodule",
+  "selected_channels": [
+    "ct_lung",
+    "lung",
+    "nodule"
+  ],
+  "expected_input_channels": 3,
+  "batch_size": 4,
+  "grad_accum_steps": 1,
+  "effective_batch_size": 4,
+  "source_oof_f1_micro": 0.5318352059925093,
+  "source_oof_f1_macro": 0.5191411311356791,
+  "source_mean_val_f1_micro": 0.5419129971152443,
+  "source_mean_test_f1_micro": 0.5338386586523253,
+  "source_num_folds_completed": 5,
+  "source_cohort_size": 204,
+  "volume_helper_path": "/mnt/homeGPU/mcribilles/tfm/codigo/DL_multietiqueta/una_validacion_solo/phase_a_serial_common.py",
+  "volume_helper_sha256": "34276e0503b9c29b541205f5eba4471d7456bb07edbd5525d06506f5b5eaa25a",
+  "source_run_root": "/mnt/homeGPU/mcribilles/tfm/codigo/DL_multietiqueta/val_externa_interna/runs/resnet18_nestedcv_focused_20260717_105720_resnet18_focused",
+  "source_config_dir": "/mnt/homeGPU/mcribilles/tfm/codigo/DL_multietiqueta/val_externa_interna/runs/resnet18_nestedcv_focused_20260717_105720_resnet18_focused/resize_small__ct_lung_nodule__bs4"
+}
