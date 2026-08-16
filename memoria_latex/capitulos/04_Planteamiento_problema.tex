@@ -1,0 +1,267 @@
+\chapter{Planteamiento del problema}\label{chap:planteamiento_problema}
+
+En este capítulo se concreta el problema abordado en el presente trabajo, definiendo la tarea de predicción prebiopsia, su formulación multietiqueta y el alcance de los análisis realizados. Asimismo, se describen las fuentes de información disponibles, las principales restricciones metodológicas de la cohorte y los recursos empleados durante el desarrollo del proyecto. El objetivo es establecer el marco experimental sobre el que se apoyan los capítulos posteriores, sin entrar todavía en los procedimientos específicos de preprocesamiento, modelado y evaluación.
+
+\section{Descripción general del problema}
+
+El problema abordado en este trabajo consiste en analizar si la información disponible antes de una biopsia pulmonar guiada por tomografía computarizada permite anticipar las complicaciones que pueden producirse tras el procedimiento. Para ello, se estudian distintas representaciones de los pacientes, incluyendo variables clínicas tabulares, volúmenes tridimensionales de TC y características cuantitativas derivadas de las imágenes.
+
+A diferencia de la formulación binaria considerada en el trabajo fin de grado previo, centrada únicamente en determinar si aparecería alguna complicación, este estudio distingue entre los principales resultados clínicos registrados. Esta ampliación permite aproximar mejor el problema a las necesidades clínicas, ya que conocer el tipo de evento adverso potencial resulta más informativo que estimar únicamente un riesgo global.
+
+\subsection{Predicción prebiopsia de complicaciones}
+
+La tarea predictiva se plantea desde una perspectiva prebiopsia. Esto implica que los modelos solo deben utilizar información disponible antes de la realización del procedimiento, de modo que su predicción pueda interpretarse como una estimación anticipada del riesgo. Las variables obtenidas después de la biopsia o durante el seguimiento posterior no forman parte de las entradas de los modelos, ya que introducirían información que no estaría disponible en un escenario de aplicación real.
+
+Para cada paciente se dispone de información clínica preprocedimental y de un estudio de TC torácica. A partir de la imagen también pueden obtenerse diferentes representaciones, como características radiómicas, máscaras de estructuras anatómicas o descriptores geométricos del nódulo y de su relación con el pulmón. El objetivo consiste en estudiar si alguna de estas fuentes, de forma aislada o combinada, contiene patrones asociados a la aparición posterior de complicaciones.
+
+Aunque el entrenamiento y la evaluación se realizan retrospectivamente sobre pacientes cuyo resultado clínico ya es conocido, el instante teórico de predicción se sitúa antes de la biopsia. Por tanto, el modelo recibe únicamente la información previa al procedimiento y genera una estimación de los posibles eventos adversos posteriores. Esta restricción resulta fundamental para evitar fugas de información y mantener la coherencia clínica del problema.
+
+\subsection{Formulación multietiqueta}
+
+La aparición de complicaciones no constituye un problema multiclase convencional, ya que un mismo paciente puede presentar más de un evento adverso. En particular, existen casos en los que se registran simultáneamente hemorragia y neumotórax. Por este motivo, el problema se formula como una tarea de clasificación multietiqueta.
+
+Para cada paciente \(i\), la salida se representa mediante un vector binario:
+
+\[
+\mathbf{y}_i =
+\left(
+y_i^{H},
+y_i^{N},
+y_i^{S}
+\right)
+\in \{0,1\}^{3},
+\]
+
+donde \(y_i^{H}\) indica la presencia de hemorragia, \(y_i^{N}\) la presencia de neumotórax y \(y_i^{S}\) la ausencia de complicaciones. Las etiquetas de hemorragia y neumotórax no son mutuamente excluyentes, por lo que ambas pueden tomar el valor uno para un mismo paciente. En cambio, la etiqueta \textit{Sin complicación} toma el valor uno únicamente cuando no se ha registrado ninguno de los eventos adversos considerados.
+
+El derrame pleural se mantuvo durante el análisis exploratorio para describir íntegramente la información clínica disponible. Sin embargo, no se incorporó como objetivo de los modelos debido a su soporte extremadamente reducido, ya que solo estaba presente en un paciente. Su inclusión como etiqueta independiente no habría permitido realizar un entrenamiento ni una evaluación suficientemente fiables.
+
+Esta formulación permite obtener una predicción diferenciada para cada resultado clínico. No obstante, también introduce dificultades adicionales respecto a la clasificación binaria, como el desbalance entre etiquetas, la escasez de algunas combinaciones y la necesidad de utilizar métricas capaces de evaluar tanto el rendimiento global como el comportamiento específico para cada complicación.
+
+\subsection{Alcance del estudio: predicción y caracterización}
+
+El alcance del trabajo comprende dos perspectivas complementarias. La primera es predictiva y busca evaluar hasta qué punto las distintas fuentes de información disponibles permiten anticipar la aparición de hemorragia, neumotórax o ausencia de complicaciones. Para ello, se comparan modelos basados en variables clínicas, características radiómicas, volúmenes tridimensionales de TC y combinaciones de varias fuentes de información.
+
+La segunda perspectiva es descriptiva y está orientada a comprender mejor la estructura del problema. En este sentido, el estudio no pretende limitarse a obtener una puntuación de rendimiento, sino también analizar qué variables o representaciones aportan información relevante, cómo afecta la posible incertidumbre de las etiquetas y qué perfiles de pacientes presentan una frecuencia diferencial de complicaciones. Para abordar estos aspectos se incorporan técnicas como el \textit{Positive-Unlabeled Learning}, destinado a explorar escenarios con posibles positivos no identificados, y el \textit{Subgroup Discovery}, utilizado para obtener reglas interpretables que caractericen grupos concretos de pacientes.
+
+Por tanto, la finalidad del trabajo no consiste exclusivamente en desarrollar el modelo con mayor rendimiento, sino en realizar una comparación metodológica amplia que permita valorar la utilidad de las distintas fuentes de información y comprender las limitaciones asociadas a una cohorte clínica de tamaño reducido y heterogénea.
+
+
+
+\section{Descripción de los datos disponibles}
+\label{sec:descripcion_datos}
+
+El conjunto de datos utilizado en este trabajo fue proporcionado de forma anonimizada por el Hospital Universitario Clínico San Cecilio de Granada. La información disponible combina datos clínicos tabulares y volúmenes de tomografía computarizada.
+
+La cohorte clínica completa está formada por 210 pacientes. No obstante, la disponibilidad de información de imagen no es idéntica para todos los casos. Tras revisar los estudios originales y seleccionar una serie principal de TC por paciente, se identificaron 209 estudios válidos. Posteriormente, se dispuso de 206 volúmenes convertidos a formato NIfTI y de sus correspondientes representaciones derivadas. Por este motivo, el número de pacientes empleado puede variar ligeramente entre bloques experimentales dependiendo de los requisitos de cada fuente de información.
+
+\subsection{Datos clínicos tabulares}
+
+La información clínica se proporcionó mediante un fichero tabular en el que cada fila corresponde a un paciente. El conjunto original contiene variables demográficas, antecedentes clínicos, información anatomopatológica y datos relacionados con la aparición de complicaciones. Entre las variables disponibles se encuentran:
+
+\begin{itemize}[itemsep=2pt, topsep=4pt]
+    \item \textbf{Identificador del paciente}: código empleado para relacionar la información clínica con los estudios de imagen y sus archivos derivados.
+    
+    \item \textbf{Sexo y edad}: variables demográficas del paciente.
+    
+    \item \textbf{Tipo de cáncer}: subtipo tumoral identificado tras el estudio anatomopatológico.
+    
+    \item \textbf{Complicación}: indicador global de la aparición o ausencia de alguna complicación asociada a la biopsia.
+    
+    \item \textbf{Tipo de complicación}: especificación de los eventos registrados, principalmente hemorragia, neumotórax y, de forma excepcional, derrame pleural.
+    
+    \item \textbf{Factores de riesgo}: antecedentes y condiciones clínicas potencialmente relevantes, como tabaquismo, hipertensión arterial, diabetes mellitus u otras comorbilidades.
+    
+    \item \textbf{Patologías pulmonares}: enfermedades respiratorias previas o alteraciones pulmonares, como enfisema, fibrosis, bronquiectasias o hipertensión pulmonar.
+    
+    \item \textbf{TC}: dispositivo utilizado para la adquisición del estudio de tomografía computarizada.
+    
+    \item \textbf{Extensión a los 1-5 años}: información de seguimiento relativa a la evolución o extensión de la enfermedad durante dicho periodo.
+    
+    \item \textbf{Anticoagulación}: información sobre el tratamiento anticoagulante del paciente.
+    
+    \item \textbf{Mutación}: presencia de alteraciones moleculares o marcadores genéticos registrados durante el proceso diagnóstico.
+\end{itemize}
+
+No todas las variables originales se utilizaron como entradas de los modelos. La información obtenida tras la biopsia, durante el diagnóstico anatomopatológico o en el seguimiento posterior se excluyó. Además, el identificador anónimo se empleó exclusivamente como clave de correspondencia entre fuentes y no se incorporó como variable predictora.
+
+\subsection{Estudios de TC en formato DICOM}
+
+Los estudios de imagen originales se proporcionaron en formato DICOM (\textit{Digital Imaging and Communications in Medicine}), estándar utilizado habitualmente para el almacenamiento y el intercambio de imágenes médicas. Cada archivo DICOM contiene la matriz de intensidades correspondiente a una imagen y un encabezado con metadatos técnicos y espaciales, como la modalidad, el fabricante, la resolución, el espaciado entre píxeles, la posición del corte o el identificador de la serie.
+
+Los datos se encontraban organizados inicialmente en carpetas asociadas a los pacientes. Sin embargo, una misma carpeta podía contener varias series DICOM correspondientes a diferentes reconstrucciones, protocolos, localizadores o imágenes auxiliares. Por tanto, la carpeta completa no podía interpretarse directamente como un único volumen tridimensional. Fue necesario identificar las series presentes y seleccionar para cada paciente la serie de TC principal que reuniera condiciones adecuadas de modalidad, geometría y cobertura anatómica.
+
+Tras esta revisión se obtuvieron 209 estudios con una serie principal válida. Los volúmenes originales presentan heterogeneidad en el número de cortes, las dimensiones en el plano, el espaciado físico y los parámetros de adquisición. Estas propiedades se analizan de forma detallada en el Capítulo~\ref{chap:eda}, donde también se justifican las operaciones posteriores de selección, homogeneización y control de calidad.
+
+\subsection{Volúmenes NIfTI derivados}
+
+A partir de las series DICOM seleccionadas se generaron volúmenes en formato NIfTI (\textit{Neuroimaging Informatics Technology Initiative}). Este formato permite almacenar en un único archivo la matriz tridimensional de intensidades y la información espacial necesaria para localizar físicamente sus vóxeles, por lo que facilita el uso de herramientas de procesamiento, segmentación y aprendizaje automático.
+
+Se dispuso de 206 volúmenes NIfTI válidos. La diferencia respecto a los 209 estudios DICOM seleccionados se debe a la existencia de algunos casos con información insuficiente o problemas de geometría que impedían obtener un volumen tridimensional adecuado. Estos casos se identificaron durante el análisis de calidad y no se utilizaron en los experimentos que requerían representación volumétrica.
+
+Los archivos NIfTI constituyen la representación de referencia para la aplicación de segmentaciones anatómicas, la extracción de características radiómicas y el entrenamiento de modelos basados en imagen. Las transformaciones específicas aplicadas sobre estos volúmenes, como normalización de intensidades, ajuste espacial o redimensionado, se describen posteriormente en la sección de preprocesamiento.
+
+\subsection{Máscaras anatómicas y segmentaciones}
+
+Además de los volúmenes de TC, se generaron máscaras tridimensionales de diferentes estructuras anatómicas relevantes para el estudio. Estas máscaras delimitan los vóxeles pertenecientes a una región concreta y permiten restringir el análisis a zonas potencialmente relacionadas con el procedimiento de biopsia.
+
+Las principales estructuras segmentadas fueron:
+
+\begin{itemize}[itemsep=2pt, topsep=4pt]
+    \item \textbf{Pulmón}: delimita el parénquima pulmonar y permite excluir gran parte de las estructuras externas al área principal de estudio.
+    
+    \item \textbf{Nódulo}: identifica la lesión pulmonar sobre la que se realiza la biopsia y constituye una de las principales regiones de interés del análisis radiómico.
+    
+    \item \textbf{Vasos pulmonares}: representa las estructuras vasculares presentes en el pulmón y permite estudiar información anatómica potencialmente relacionada con el riesgo hemorrágico.
+    
+    \item \textbf{Estructuras bronquiales}: recoge la vía aérea visible y proporciona información adicional sobre el entorno anatómico de la lesión.
+\end{itemize}
+
+Las máscaras se almacenaron también en formato NIfTI, conservando la correspondencia espacial con el volumen de TC asociado. A partir de ellas se obtuvieron tanto características radiómicas como medidas geométricas sencillas relacionadas con el tamaño del nódulo y su posición respecto a la pleura. El procedimiento utilizado para generar y procesar estas segmentaciones se desarrolla en el Capítulo~\ref{chap:eda} y en los capítulos experimentales correspondientes.
+
+% \subsection{Correspondencia entre pacientes, imágenes y etiquetas}
+
+% La integración de las distintas fuentes se realizó mediante el identificador anónimo asignado a cada paciente. Este código permitió relacionar la fila correspondiente del fichero clínico con la serie DICOM seleccionada, el volumen NIfTI, las máscaras anatómicas y las etiquetas de complicación.
+
+% La cobertura clínica fue completa para los 210 pacientes, mientras que 209 disponían de una TC principal válida y 206 contaban con un volumen NIfTI adecuado para el procesamiento tridimensional. En consecuencia, se definieron diferentes cohortes experimentales según la información requerida en cada análisis. Los experimentos exclusivamente clínicos pudieron utilizar la cohorte completa, mientras que los modelos radiómicos, geométricos o basados directamente en imagen se limitaron a los pacientes con los archivos necesarios.
+
+% Esta separación se tuvo en cuenta al comparar configuraciones. Cuando el objetivo era estudiar la aportación relativa de dos fuentes de información, se utilizaron cohortes emparejadas formadas por los mismos pacientes, evitando atribuir a una modalidad diferencias que pudieran deberse únicamente a cambios en la composición de la muestra.
+
+
+\section{Legalidad de los datos}
+
+Los datos médicos empleados en este proyecto corresponden a volúmenes de tomografía computarizada en formato DICOM, previamente anonimizados por el equipo clínico responsable. Este proceso consistió en la eliminación de los identificadores personales directos e indirectos contenidos en los metadatos de los archivos DICOM, de acuerdo con las directrices recogidas en el \emph{Considerando 26 del Reglamento (UE) 2016/679 (RGPD)} \cite{gdprRecital26}, según el cual los datos anonimizados de forma irreversible quedan excluidos del ámbito de aplicación de dicho reglamento.
+
+Asimismo, conforme a lo establecido en la \emph{Ley Orgánica 3/2018}, de \emph{Protección de Datos Personales y garantía de los derechos digitales}, en particular en su \emph{Disposición adicional decimoséptima, apartado 2, letra e} \cite{lopd2018}, se considera que los datos utilizados no presentan una probabilidad razonable de reidentificación de los pacientes. De este modo, el tratamiento de la información empleada en este estudio se ajusta a la normativa vigente en materia de protección de datos personales y sigue las recomendaciones establecidas por la \emph{Agencia Española de Protección de Datos (AEPD)} \cite{aepdAnonimizacion}.
+
+La correcta anonimización de los datos constituye un requisito fundamental para el desarrollo responsable de proyectos de inteligencia artificial en el ámbito sanitario, ya que permite preservar la privacidad de los pacientes y garantizar el respeto a sus derechos fundamentales durante todo el proceso de análisis y modelado.
+
+
+
+\section{Restricciones y dificultades metodológicas}
+
+El problema estudiado presenta varias limitaciones derivadas de la naturaleza clínica de los datos, su dimensionalidad y la forma en que se definen y observan las etiquetas de complicación. Estas restricciones condicionan tanto el diseño experimental como la interpretación de los resultados y deben tenerse en cuenta al valorar la capacidad de generalización de los modelos.
+
+\subsection{Tamaño muestral y distribución de las etiquetas}
+
+La principal limitación del estudio es el tamaño reducido de la cohorte en comparación con la complejidad de los modelos evaluados. Esta dificultad es especialmente relevante en los enfoques de aprendizaje profundo, donde el número de parámetros puede ser elevado respecto al número de pacientes disponibles, aumentando el riesgo de sobreajuste.
+
+La formulación multietiqueta introduce además un desequilibrio entre los distintos resultados clínicos. Aunque la etiqueta global binaria de complicación presenta una distribución equilibrada, las complicaciones específicas tienen un soporte desigual y algunas combinaciones de etiquetas aparecen en muy pocos pacientes. Por este motivo, el derrame pleural no se incluyó como objetivo predictivo independiente, al estar registrado únicamente en un paciente.
+
+También debe considerarse la posible incertidumbre de las etiquetas clínicas. La ausencia de una complicación registrada no garantiza necesariamente que el paciente constituya un negativo completamente fiable, ya que pueden existir eventos leves, registros incompletos o diferencias en los criterios de anotación. Esta posibilidad motivó la exploración de técnicas de \textit{Positive-Unlabeled Learning}.
+
+\subsection{Heterogeneidad y alta dimensionalidad de los datos}
+
+Los estudios de TC proceden de diferentes equipos y protocolos de adquisición, por lo que presentan variabilidad en el número de cortes, la resolución, el espaciado entre vóxeles, el grosor de corte y los parámetros de reconstrucción. Esta heterogeneidad puede introducir diferencias técnicas no relacionadas con la aparición de complicaciones y dificultar el aprendizaje de patrones generalizables.
+
+Asimismo, tanto los volúmenes de TC como las representaciones radiómicas presentan una dimensionalidad elevada. En el caso de la radiómica, el número de características puede ser comparable o superior al número de pacientes, lo que incrementa el riesgo de redundancia y sobreajuste. Por ello, fue necesario aplicar procedimientos de homogeneización, reducción de dimensionalidad y selección de características dentro del proceso de validación.
+
+\subsection{Riesgo de fuga de información}
+
+Una dificultad metodológica central es evitar que los modelos utilicen información que no estaría disponible antes de la biopsia. Por este motivo, se excluyeron como predictores las variables obtenidas después del procedimiento, durante el diagnóstico o en el seguimiento posterior.
+
+Además, todas las transformaciones dependientes de los datos, como la imputación, el escalado, la selección de características o la reducción de dimensionalidad, deben ajustarse exclusivamente con los pacientes del conjunto de entrenamiento de cada partición. Aplicarlas previamente sobre la cohorte completa produciría una fuga de información y una estimación optimista del rendimiento.
+
+El identificador anónimo del paciente tampoco se utilizó como predictor, ya que su estructura contenía información codificada sobre determinadas características clínicas y sobre el resultado de la biopsia.
+
+% \subsection{Validación y generalización clínica}
+
+% La disponibilidad de datos procedentes de un único centro impide realizar una validación externa independiente. En consecuencia, la evaluación se basa principalmente en validación cruzada, procurando mantener particiones coherentes entre experimentos y evitar que datos del mismo paciente aparezcan simultáneamente en entrenamiento y evaluación.
+
+% Los resultados obtenidos deben interpretarse como evidencia preliminar sobre la viabilidad de las estrategias estudiadas. Antes de considerar una aplicación clínica sería necesario validar los modelos sobre cohortes externas, procedentes de otros centros y equipos de adquisición, y realizar una evaluación prospectiva con participación del equipo médico. Por tanto, el trabajo no pretende proporcionar una herramienta clínica definitiva, sino identificar enfoques prometedores, limitaciones metodológicas y posibles líneas de mejora.
+
+
+
+\section{Metodología}
+
+La metodología de trabajo se enmarca en un enfoque empírico y aplicado, situado en la intersección entre la ingeniería informática, la inteligencia artificial y el ámbito médico. 
+
+El desarrollo del trabajo se ha organizado siguiendo un procedimiento estructurado, inspirado en el método científico y adaptado a las particularidades del problema clínico estudiado. Las fases principales de la metodología seguida son las siguientes:
+
+\begin{itemize}
+    \item \textbf{Observación.} Se estudió el contexto clínico de las biopsias pulmonares, las complicaciones asociadas y el estado del arte sobre inteligencia artificial aplicada a imagen médica y predicción de riesgos clínicos.
+    
+    \item \textbf{Formulación de hipótesis.} Se planteó que la aparición de complicaciones podría estar relacionada con patrones presentes en los datos clínicos tabulares y en los volúmenes de TC, por lo que se evaluaron modelos capaces de explotar ambas fuentes de información.
+    
+    \item \textbf{Recogida de datos.} Se trabajó con datos anonimizados proporcionados por el Hospital Universitario Clínico San Cecilio de Granada, incluyendo estudios de TC en formato DICOM y variables clínicas asociadas a cada paciente.
+    
+    \item \textbf{Preprocesamiento y segmentación.} Se aplicaron procedimientos específicos para preparar los datos: limpieza y codificación de variables clínicas, selección y conversión de series de TC, normalización de intensidades, homogeneización volumétrica y segmentación anatómica.
+    
+    \item \textbf{Prueba de hipótesis.} Se entrenaron y evaluaron diferentes aproximaciones basadas en aprendizaje automático, aprendizaje profundo, estrategias multimodales y técnicas más avanzadas de IA para analizar su capacidad predictiva.
+    
+    \item \textbf{Comprobación y análisis.} Los resultados se estudiaron mediante métricas de clasificación e interpretación técnica y clínica, considerando las limitaciones del conjunto de datos y la influencia del preprocesamiento.
+    
+    \item \textbf{Conclusiones.} Finalmente, se extrajeron conclusiones sobre la viabilidad del enfoque propuesto, la utilidad de las fuentes de información disponibles y las posibles líneas futuras de mejora y validación clínica.
+\end{itemize}
+
+
+
+
+
+\section{Software}
+%     \subsection{Lenguaje de programación y entorno de trabajo}
+%     \subsection{Bibliotecas para datos tabulares}
+%     \subsection{Bibliotecas para imagen médica}
+%     \subsection{Bibliotecas para aprendizaje automático y deep learning}
+%     \subsection{Herramientas de visualización y trazabilidad}
+\textcolor{red}{HACERLO CUANDO ESTÉ TODA LA PROGRAMACIÓN HECHA. }
+
+
+
+\section{Hardware}
+Para el desarrollo experimental del proyecto se utilizaron los servidores de cómputo de alto rendimiento NGPU proporcionados por la Universidad de Granada (UGR), ubicados en el CPD Santa Lucía. Esta infraestructura permitió ejecutar las tareas con mayor coste computacional, especialmente el entrenamiento y la evaluación de modelos.
+
+La infraestructura NGPU de la UGR dispone de un clúster de nodos de cómputo con distintas configuraciones de GPU, entre las que se incluyen GTX Titan, X Pascal, GTX Titan Xp, RTX 2080 Ti, Titan RTX, Tesla V100 de 32 GB y Tesla A100 de 40 GB. 
+
+
+\section{Presupuesto}
+
+A continuación, se presenta el presupuesto estimado para la realización del proyecto. Este presupuesto incluye los recursos humanos necesarios para el desarrollo del trabajo, así como una estimación del coste asociado al uso de infraestructura de cómputo para el entrenamiento y evaluación de los modelos. La duración total del proyecto se estima en \textit{6 meses}, desde marzo de 2026 hasta agosto de 2026, ambos incluidos.
+
+Se excluyen de este presupuesto los costes personales propios del investigador, como el uso de ordenador personal, alquiler de vivienda o consumo eléctrico doméstico. Asimismo, dado que las tareas de cómputo se han realizado en servidores proporcionados por la Universidad de Granada, los costes de infraestructura se consideran como una estimación equivalente y no como un gasto directo del proyecto.
+
+Las fuentes utilizadas para la estimación de costes son \textit{Glassdoor}, para la estimación del coste asociado al perfil de \textit{Junior Software Engineer}\footnote{\url{https://www.glassdoor.es/Sueldos/junior-software-engineer-sueldo-SRCH_KO0,24.htm}} y al perfil médico\footnote{\url{https://www.glassdoor.es/Sueldos/medico-sueldo-SRCH_KO0,6.htm}}, y \textit{Google Cloud}, para la estimación equivalente del coste de infraestructura de cómputo con GPU\footnote{\url{https://cloud.google.com/compute/gpus-pricing}}.
+\subsection{Recursos humanos}
+
+El equipo del proyecto está compuesto por el investigador principal, responsable del desarrollo técnico, análisis de datos y evaluación de modelos; un médico colaborador, encargado de la orientación clínica y supervisión del problema médico; y el tutor académico, responsable de la dirección y seguimiento del trabajo. En la Tabla~\ref{tab:recursos-humanos} se detallan los costes asociados.
+
+\begin{table}[!htbp]
+    \centering
+    \begin{tabularx}{\textwidth}{|X|c|c|c|}
+        \hline
+        \textbf{Recurso} & \textbf{Coste mensual} & \textbf{Duración} & \textbf{Coste total} \\ \hline
+        Investigador principal & 1.800 € & 6 meses & 10.800 € \\ 
+        Médico colaborador & 3.000 € & 6 meses & 18.000 € \\ 
+        Tutor académico (25 h) & 2.000 € & 1 mes & 2.000 € \\ \hline
+        \textbf{Total recursos humanos} & & & \textbf{30.800 €} \\ \hline
+    \end{tabularx}
+    \caption{Presupuesto estimado destinado a recursos humanos.}
+    \label{tab:recursos-humanos}
+\end{table}
+
+\subsection{Capacidad de cómputo}
+
+El entrenamiento y evaluación de modelos sobre volúmenes de tomografía computarizada requiere infraestructura de alto rendimiento, especialmente en los experimentos con modelos tridimensionales. En este proyecto se han utilizado los servidores NGPU proporcionados por la Universidad de Granada, por lo que no se ha generado un coste directo asociado a servicios comerciales en la nube.
+
+No obstante, para reflejar el valor aproximado de la infraestructura empleada, se incluye una estimación equivalente basada en el uso de servidores con GPU y almacenamiento durante el periodo de desarrollo experimental. Esta estimación se muestra en la Tabla~\ref{tab:computo}.
+
+\begin{table}[!htbp]
+    \centering
+    \begin{tabularx}{\textwidth}{|X|c|c|c|}
+        \hline
+        \textbf{Recurso} & \textbf{Coste mensual} & \textbf{Duración} & \textbf{Coste total} \\ \hline
+        Servidores GPU & 100 € & 6 meses & 600 € \\ 
+        Almacenamiento (1 TB) & 50 € & 6 meses & 300 € \\ \hline
+        \textbf{Total capacidad de cómputo} & & & \textbf{900 €} \\ \hline
+    \end{tabularx}
+    \caption{Estimación equivalente del coste asociado a capacidad de cómputo.}
+    \label{tab:computo}
+\end{table}
+
+\subsection{Materiales y otros gastos}
+
+No se prevén gastos adicionales en licencias de software, ya que las herramientas utilizadas durante el desarrollo del proyecto son de código abierto o de uso libre en el ámbito académico, como Python, PyTorch, MONAI, PyRadiomics, scikit-learn y otras bibliotecas empleadas para el análisis y modelado de los datos. Tampoco se consideran necesarias compras de material adicional.
+
+\subsection{Presupuesto total estimado}
+
+El presupuesto total estimado para el desarrollo del proyecto durante un periodo de 6 meses asciende a \textbf{31.700 €}. Este importe incluye los recursos humanos y una estimación equivalente del uso de infraestructura de cómputo. Si se considera únicamente el gasto directo, excluyendo el coste imputado de los servidores NGPU cedidos por la Universidad de Granada, el presupuesto sería de \textbf{30.800 €}.

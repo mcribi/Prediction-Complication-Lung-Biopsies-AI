@@ -143,3 +143,31 @@ codigo/clasif_binaria/config/valid_configurations.HUGE.json
 /codigo/subgroup_discovery/results/
 /codigo/subgroup_discovery/preliminar/
 /codigo/subgroup_discovery/**/__pycache__/
+
+# --- PU learning: datos, identificadores y artefactos sensibles/regenerables ---
+/codigo/pu_learning/**/manifest/
+/codigo/pu_learning/**/manifests/
+/codigo/pu_learning/**/results/
+/codigo/pu_learning/**/runs/
+/codigo/pu_learning/**/nested_grid_runs/
+/codigo/pu_learning/**/baseline_grid/
+/codigo/pu_learning/**/baseline_grid_extended/
+/codigo/pu_learning/**/*.csv
+
+# --- Memoria LaTeX: compilacion local y figuras medicas sensibles ---
+/memoria_latex/proyecto.pdf
+/memoria_latex/proyecto.aux
+/memoria_latex/proyecto.bbl
+/memoria_latex/proyecto.blg
+/memoria_latex/proyecto.fdb_latexmk
+/memoria_latex/proyecto.fls
+/memoria_latex/proyecto.lof
+/memoria_latex/proyecto.log
+/memoria_latex/proyecto.lot
+/memoria_latex/proyecto.synctex.gz
+/memoria_latex/proyecto.toc
+/memoria_latex/imagenes/eda/control_visual_calidad_ct.png
+/memoria_latex/imagenes/eda/hu_ejemplos.png
+
+# --- Configuracion local con rutas absolutas del servidor ---
+/.vscode/

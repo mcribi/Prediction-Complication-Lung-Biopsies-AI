@@ -1,0 +1,444 @@
+\chapter{Deep Learning}\label{chap:DL}
+
+\section{Modelos tridimensionales basados únicamente en imagen} \label{sec:modelos-3d-solo-imagen}
+
+En esta sección se ha estudiado la capacidad de diferentes modelos convolucionales tridimensionales para abordar la clasificación multietiqueta de las complicaciones utilizando exclusivamente información de imagen, sin incorporar variables clínicas ni características radiómicas. Para ello, se ha analizado la influencia de la arquitectura, la representación de las regiones anatómicas, la resolución espacial y el tratamiento de las intensidades dentro de un mismo marco experimental. A continuación, se presentan las arquitecturas evaluadas, la configuración y el procedimiento de validación empleados, la organización de los experimentos y, finalmente, los resultados obtenidos y su análisis.
+
+\subsection{Arquitecturas evaluadas}
+
+Se han evaluado cinco arquitecturas convolucionales tridimensionales: ResNet-10, ResNet-18, ResNet-34, SE-ResNet-50 y DenseNet-121. Todas ellas se han implementado mediante MONAI. Los modelos se han configurado con convoluciones tridimensionales para procesar directamente la información volumétrica de las tomografías computarizadas, evitando reducir el estudio a cortes bidimensionales independientes.
+
+La familia ResNet se basa en el aprendizaje residual, que introduce conexiones de identidad entre bloques convolucionales. En lugar de aprender directamente una transformación completa, cada bloque aproxima una función residual que se suma a su entrada. Estas conexiones favorecen la propagación del gradiente y permiten aumentar la profundidad de la red sin que el entrenamiento se degrade con la misma facilidad \cite{he2016deep}. Se han considerado tres variantes de esta familia:
+
+\begin{itemize}
+    \item \textbf{ResNet-10}: se ha incluido como la arquitectura residual de menor profundidad y capacidad, con el objetivo de disponer de un modelo comparativamente ligero y reducir el riesgo de sobreajuste en una cohorte limitada.
+    \item \textbf{ResNet-18}: se ha utilizado como arquitectura residual de referencia, al ofrecer un compromiso entre capacidad de representación, coste computacional y número de parámetros.
+    \item \textbf{ResNet-34}: se ha evaluado para estudiar si una mayor profundidad permite extraer representaciones volumétricas más discriminativas que las obtenidas con ResNet-10 y ResNet-18.
+\end{itemize}
+
+Además, se ha evaluado \textbf{SE-ResNet-50}, que amplía la arquitectura residual mediante bloques \textit{Squeeze-and-Excitation}. Estos bloques resumen la información espacial de cada mapa de características y generan coeficientes de recalibración para ponderar de forma adaptativa la relevancia de cada canal \cite{hu2018squeeze}. Su inclusión ha permitido estudiar si este mecanismo de atención por canales resulta útil para destacar patrones volumétricos asociados a las distintas complicaciones, aunque introduce una arquitectura de mayor capacidad y coste computacional que las variantes residuales anteriores.
+
+Como alternativa a las conexiones residuales, se ha incluido \textbf{DenseNet-121}. En esta arquitectura, cada capa recibe como entrada la concatenación de los mapas de características generados por las capas anteriores del mismo bloque denso. Este patrón favorece la reutilización de características y crea rutas cortas para la propagación de la información y del gradiente \cite{huang2017densely}. Su incorporación permite comparar el aprendizaje residual con una estrategia de conectividad densa dentro del mismo problema de clasificación volumétrica y, al mismo tiempo, mantener la continuidad con el trabajo fin de grado previo, en el que DenseNet-121 fue la arquitectura que obtuvo el mejor rendimiento.
+
+Las cinco arquitecturas se han adaptado al problema multietiqueta mediante una capa de salida con tres unidades, correspondientes a hemorragia, neumotórax y ausencia de complicación. El número de canales de entrada se ha determinado dinámicamente según la representación de imagen empleada en cada experimento. En ResNet-10, ResNet-18 y ResNet-34 se ha incorporado una capa de \textit{dropout} antes de la capa completamente conectada final; la misma adaptación se ha aplicado antes del clasificador de SE-ResNet-50. En DenseNet-121, el \textit{dropout} se ha integrado en las capas densas mediante el parámetro específico de la implementación. En todos los casos se ha utilizado una probabilidad de \textit{dropout} de 0,3 y los modelos se han entrenado desde una inicialización aleatoria, sin utilizar pesos preentrenados.
+
+La selección de estas arquitecturas ha permitido comparar de forma progresiva el efecto de la profundidad dentro de una misma familia residual y, al mismo tiempo, contrastar tres mecanismos de extracción de características: conexiones residuales, recalibración de canales y conectividad densa. Todas las variantes se han integrado en el mismo marco de entrenamiento y validación, descrito en las subsecciones siguientes.
+
+
+
+\subsection{Configuración experimental}
+
+Los experimentos se han planteado como un problema de clasificación multietiqueta basado exclusivamente en información de imagen. Las variables objetivo han sido hemorragia, neumotórax y ausencia de complicación. Esta última se ha definido como una etiqueta derivada, activa cuando no se ha registrado ninguna de las dos complicaciones principales. Tras intersectar la información clínica con la disponibilidad de los volúmenes y de las máscaras requeridas por todas las configuraciones, la cohorte efectiva utilizada por el pipeline ha estado formada por 204 pacientes.
+
+
+Con el objetivo de analizar la contribución de las distintas regiones anatómicas, no se ha utilizado el volumen completo de TC como una única entrada sin restricciones. En su lugar, se han construido representaciones guiadas por las segmentaciones disponibles:
+
+\begin{itemize}
+    \item \textbf{TC restringida al nódulo}: el volumen de TC se ha multiplicado por la máscara binaria del nódulo, de modo que únicamente se ha conservado la información de intensidad correspondiente a esta región.
+    \item \textbf{TC pulmonar, pulmón y nódulo}: se han utilizado como canales independientes la TC restringida por la máscara pulmonar, la máscara binaria del pulmón y la máscara binaria del nódulo.
+    \item \textbf{TC pulmonar, pulmón, nódulo y vasos}: se ha añadido la máscara binaria de los vasos a la representación anterior, con el objetivo de aportar información sobre la relación espacial entre la lesión y las estructuras vasculares próximas.
+\end{itemize}
+
+Las tres representaciones se han evaluado con ResNet-10, ResNet-18, ResNet-34 y SE-ResNet-50. En DenseNet-121 se han considerado únicamente la TC restringida al nódulo y la combinación de TC pulmonar, pulmón y nódulo, debido al mayor coste computacional de esta arquitectura. Cuando el preprocesamiento ha generado varias ventanas de intensidad, cada ventana se ha incorporado como un canal independiente, manteniendo además como canales separados las máscaras anatómicas correspondientes. Por tanto, el número final de canales de entrada se ha ajustado dinámicamente en función de la representación y del preprocesamiento utilizados.
+
+Antes de introducir los volúmenes en la red, los valores no finitos se han sustituido por cero y las intensidades se han limitado al intervalo $[0,1]$. No se han aplicado transformaciones de aumento de datos durante esta fase experimental, con el fin de mantener constante el procedimiento y centrar la comparación en la arquitectura, la resolución, el tratamiento de intensidades y la combinación de regiones anatómicas.
+
+Con respecto a los volúmenes preprocesados, se han considerado cuatro resoluciones espaciales:
+
+\begin{itemize}
+    \item volúmenes cúbicos de $64 \times 64 \times 64$ vóxeles;
+    \item volúmenes cúbicos de $128 \times 128 \times 128$ vóxeles;
+    \item volúmenes de $128 \times 256 \times 256$ vóxeles;
+    \item volúmenes de $256 \times 512 \times 512$ vóxeles.
+\end{itemize}
+
+Para cada resolución se han evaluado cuatro variantes de intensidad: una versión base, una ventana de unidades Hounsfield entre $-300$ y $1400$, una ventana entre $-600$ y $1500$, y una representación \textit{multiwindowing} formada por tres ventanas almacenadas en canales separados. De este modo, el diseño ha permitido estudiar conjuntamente el efecto de la resolución espacial y de la representación de intensidades, manteniendo constantes los restantes hiperparámetros de optimización.
+
+Todos los modelos se han entrenado desde una inicialización aleatoria durante un máximo de 50 épocas. Se ha utilizado el optimizador AdamW, con una tasa de aprendizaje inicial de $10^{-4}$ y un término de decaimiento de pesos de $10^{-4}$. La tasa de aprendizaje se ha reducido a la mitad cuando la pérdida de validación interna no ha mejorado durante tres épocas consecutivas. Asimismo, se ha aplicado \textit{dropout} con probabilidad 0,3 y parada temprana con una paciencia de 10 épocas. 
+
+La función de pérdida utilizada ha sido la entropía cruzada binaria con logits, aplicada independientemente a cada etiqueta. Para compensar el desequilibrio entre clases, se ha asignado a cada etiqueta un peso positivo calculado como la razón entre el número de ejemplos negativos y positivos. Estos pesos se han estimado de nuevo en cada partición utilizando exclusivamente los pacientes del subconjunto de entrenamiento interno, evitando incorporar información de validación o de prueba.
+
+El tamaño de lote se ha adaptado a la memoria requerida por cada resolución. Para los volúmenes de $64^3$ se ha empleado un tamaño de lote de 16; para los de $128^3$, un tamaño de 8; y para los de $128 \times 256 \times 256$, un tamaño de 4. En los volúmenes de mayor resolución, $256 \times 512 \times 512$, se ha utilizado un tamaño de lote físico de 1 y acumulación de gradientes durante cuatro iteraciones, obteniendo un tamaño de lote efectivo de 4. Esta estrategia ha permitido procesar los volúmenes de mayor tamaño sin modificar la memoria disponible, aunque el lote efectivo mediante acumulación no es estrictamente equivalente a emplear cuatro muestras simultáneas.
+
+Para favorecer la reproducibilidad se ha fijado la semilla aleatoria a 17 en Python, NumPy y PyTorch. También se ha activado el comportamiento determinista de cuDNN y se ha deshabilitado la selección automática de algoritmos basada en rendimiento. El entrenamiento se ha realizado con precisión mixta automática para reducir el consumo de memoria y acelerar las operaciones compatibles.
+
+
+\subsection{Validación y métricas}
+
+Para obtener una estimación rigurosa y comparable del rendimiento, se ha definido un procedimiento que separa la selección de los modelos de su evaluación final y se ha establecido un conjunto común de métricas adaptadas al carácter multietiqueta del problema. Ambos aspectos se describen a continuación.
+
+\subsubsection{Validación}
+
+Para estimar la capacidad de generalización de cada configuración se ha utilizado una validación cruzada externa de cinco folds. La partición se ha estratificado a partir de la combinación de etiquetas de cada paciente, de modo que se ha tratado de conservar en los distintos folds la distribución de los patrones multietiqueta presentes en la cohorte. En cada iteración, cuatro folds han constituido el conjunto de entrenamiento externo y el fold restante se ha reservado como conjunto de prueba externo. De esta forma, cada paciente ha formado parte del conjunto de prueba exactamente una vez para cada configuración.
+
+Dentro de cada conjunto de entrenamiento externo se ha realizado una segunda división, destinando el 20\,\% de los pacientes a validación interna y utilizando el resto para el entrenamiento del modelo. Esta partición se ha estratificado también según la combinación de etiquetas cuando la frecuencia de los patrones multietiqueta lo ha permitido; en caso contrario, se ha empleado una partición aleatoria reproducible. Por tanto, en cada fold externo se han definido tres subconjuntos disjuntos: entrenamiento interno, validación interna y prueba externa.
+
+El modelo se ha ajustado exclusivamente con los pacientes del conjunto de entrenamiento interno. Al finalizar cada época, se ha calculado el F1 micro sobre la validación interna y se ha conservado el estado del modelo cuando esta métrica ha superado el mejor valor previo en al menos $10^{-4}$. La parada temprana se ha activado cuando no se ha observado una mejora suficiente durante 10 épocas consecutivas. Por su parte, la pérdida de validación interna se ha utilizado únicamente para controlar la reducción de la tasa de aprendizaje, por lo que el criterio de selección del checkpoint y el criterio del planificador han permanecido diferenciados.
+
+Una vez finalizado el entrenamiento de cada fold, se ha recuperado el checkpoint seleccionado mediante la validación interna y se ha evaluado sobre el conjunto de prueba externo. Este conjunto no se ha utilizado para ajustar los parámetros del modelo, modificar la tasa de aprendizaje, aplicar la parada temprana ni seleccionar la época final. Así, la selección del modelo y la estimación de su rendimiento se han realizado sobre subconjuntos independientes, evitando utilizar las mismas observaciones para ambas funciones.
+
+Las predicciones obtenidas en los cinco conjuntos de prueba externos se han concatenado para construir las predicciones \textit{out-of-fold} (OOF) de cada configuración. En consecuencia, las métricas OOF se han calculado a partir de una única predicción externa por paciente y no han incorporado predicciones procedentes de la validación interna. Además de estas métricas conjuntas, se han conservado las métricas de cada fold para poder resumir su variabilidad mediante la media y la desviación estándar. Antes de interpretar cualquier resultado agregado, se ha comprobado que la configuración contiene los cinco folds externos completos.
+
+\subsubsection{Métricas}
+Las salidas de la red se han transformado en probabilidades mediante la función sigmoide. Posteriormente, cada etiqueta se ha convertido de manera independiente en una predicción binaria utilizando un umbral fijo de 0,5. Este procedimiento ha permitido asignar simultáneamente más de una complicación a un mismo paciente, de acuerdo con la formulación multietiqueta del problema.
+
+La métrica principal utilizada para seleccionar el checkpoint y comparar las configuraciones ha sido el F1 micro. Esta medida calcula conjuntamente los verdaderos positivos, falsos positivos y falsos negativos de todas las etiquetas, por lo que resume el equilibrio global entre precisión y sensibilidad. Como medida complementaria se ha utilizado el F1 macro, obtenido como la media no ponderada del F1 de cada etiqueta. A diferencia de la variante micro, esta métrica otorga la misma importancia a hemorragia, neumotórax y ausencia de complicación, independientemente de su frecuencia. También se ha calculado el F1 de cada etiqueta por separado para identificar posibles diferencias de comportamiento entre las tres clases.
+
+El análisis se ha completado con la precisión y la sensibilidad micro. La precisión ha cuantificado la proporción de etiquetas positivas predichas que han sido correctas, mientras que la sensibilidad ha medido la proporción de etiquetas positivas reales que el modelo ha identificado. Asimismo, se ha calculado el índice de Jaccard micro, que expresa la relación entre la intersección y la unión de los conjuntos de etiquetas reales y predichas tras agregar las decisiones de todas las clases.
+
+Finalmente, se han incluido dos métricas centradas en la predicción multietiqueta completa. La exactitud de subconjunto ha considerado correcta una muestra únicamente cuando las tres etiquetas predichas han coincidido exactamente con las etiquetas reales, por lo que constituye un criterio especialmente estricto. La pérdida de Hamming ha medido la proporción de decisiones individuales de etiqueta que han sido incorrectas; en este caso, los valores más bajos han indicado un mejor rendimiento. Las métricas se han calculado tanto sobre cada conjunto de prueba externo como sobre el conjunto OOF completo, permitiendo analizar conjuntamente el rendimiento medio entre folds, su variabilidad y el comportamiento global sobre la cohorte.
+
+
+
+\subsection{Experimentos realizados}
+
+El estudio se ha organizado en cinco bloques experimentales, uno por arquitectura. En ResNet-10, ResNet-18, ResNet-34 y SE-ResNet-50 se han combinado los 16 preprocesamientos con las tres representaciones de entrada, dando lugar a 48 configuraciones por arquitectura. En DenseNet-121 se han combinado los mismos preprocesamientos con dos representaciones, obteniendo 32 configuraciones. La distribución del diseño experimental se resume en la Tabla~\ref{tab:dl_experimentos}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Distribución de las configuraciones de deep learning por arquitectura.}
+    \label{tab:dl_experimentos}
+    \begin{tabular}{lccc}
+        \hline
+        \textbf{Arquitectura} & \textbf{Preprocesamientos} & \textbf{Entradas} & \textbf{Configuraciones} \\
+        \hline
+        ResNet-10    & 16 & 3 & 48 \\
+        ResNet-18    & 16 & 3 & 48 \\
+        ResNet-34    & 16 & 3 & 48 \\
+        SE-ResNet-50 & 16 & 3 & 48 \\
+        DenseNet-121 & 16 & 2 & 32 \\
+        \hline
+        \textbf{Total} & -- & -- & \textbf{224} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Cada una de las 224 configuraciones se ha asociado a cinco entrenamientos, uno por fold externo, por lo que el diseño completo ha contemplado un máximo de 1120 procesos de entrenamiento y evaluación. Los bloques se han ejecutado de forma independiente y los artefactos se han organizado por arquitectura, configuración y fold para mantener la trazabilidad. Únicamente se han considerado completas las configuraciones que han generado correctamente los resultados de los cinco folds externos.
+
+
+\subsection{Resultados y análisis}\label{subsubsec:resultados-dl-solo-imagen}
+
+En esta sección se presentan los resultados obtenidos por los modelos de deep learning entrenados únicamente con información de imagen.
+
+La Tabla \ref{tab:resultados-dl-imagen-top} muestra las configuraciones con mejor rendimiento según F1 micro OOF. La mejor configuración ha sido SEResNet50 con el preprocesado de volúmenes de tamaño $128 \times 128 \times 128$ y ventanas HU separadas (\texttt{resize\_cube128\_multiwindowing\_separadas}), junto con la entrada formada por TC pulmonar, máscara de pulmón, máscara de nódulo y máscara de vasos (\texttt{ct\_lung\_nodule\_vessels}), alcanzando un F1 micro de 0.5596 y un F1 macro de 0.4981.
+
+\begin{table}[!htbp]
+\centering
+\caption{Treinta mejores configuraciones de deep learning basadas únicamente en imagen, ordenadas por F1 micro OOF.}
+\label{tab:resultados-dl-imagen-top}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrcc}
+\toprule
+\textbf{Modelo} & \textbf{Preprocesado} & \textbf{Entrada} & \textbf{Batch} & \textbf{F1 micro} & \textbf{F1 macro} \\
+\midrule
+SEResNet50 & \texttt{resize\_cube128\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5596 & 0.4981 \\
+ResNet10 & \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule} & 16 & 0.5550 & 0.4601 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule} & 8 & 0.5516 & 0.4461 \\
+ResNet34 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule\_vessels} & 4 & 0.5469 & 0.5156 \\
+ResNet34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 4 & 0.5465 & 0.5328 \\
+ResNet18 & \texttt{resize\_cube128} & \texttt{nodule\_only\_masked\_ct} & 8 & 0.5447 & 0.5072 \\
+ResNet18 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5402 & 0.3974 \\
+ResNet18 & \texttt{resize\_small\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 4 & 0.5385 & 0.5207 \\
+ResNet34 & \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 16 & 0.5365 & 0.4168 \\
+ResNet10 & \texttt{resize\_small\_hu\_m600\_1500} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5349 & 0.5254 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 8 & 0.5345 & 0.4287 \\
+ResNet34 & \texttt{resize\_small\_multiwindowing\_separadas} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5339 & 0.5209 \\
+ResNet34 & \texttt{resize\_small} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5338 & 0.5289 \\
+ResNet18 & \texttt{resize\_small} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5336 & 0.5198 \\
+ResNet18 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule} & 4 & 0.5318 & 0.5191 \\
+ResNet34 & \texttt{resize\_cube128\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5316 & 0.4798 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5275 & 0.4499 \\
+ResNet18 & \texttt{resize\_cube64\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 16 & 0.5275 & 0.4382 \\
+ResNet10 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule} & 4 & 0.5250 & 0.4825 \\
+ResNet10 & \texttt{resize\_cube64\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule} & 16 & 0.5240 & 0.4660 \\
+ResNet18 & \texttt{resize\_small\_multiwindowing\_separadas} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5211 & 0.5130 \\
+ResNet10 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule} & 8 & 0.5208 & 0.4461 \\
+SEResNet50 & \texttt{resize\_cube128} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5205 & 0.4602 \\
+ResNet34 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule} & 4 & 0.5226 & 0.5132 \\
+ResNet18 & \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule} & 16 & 0.5198 & 0.4087 \\
+ResNet34 & \texttt{resize\_cube64\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 16 & 0.5195 & 0.4249 \\
+ResNet10 & \texttt{resize\_cube128\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 8 & 0.5187 & 0.4376 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{nodule\_only\_masked\_ct} & 8 & 0.5185 & 0.4333 \\
+ResNet18 & \texttt{resize\_cube64} & \texttt{ct\_lung\_nodule} & 16 & 0.5183 & 0.4256 \\
+ResNet34 & \texttt{resize\_small\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 4 & 0.5172 & 0.5015 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+Aunque la mejor configuración global ha correspondido a SEResNet50, los resultados muestran que varias arquitecturas han alcanzado rendimientos cercanos. En particular, ResNet10 ha obtenido el segundo mejor F1 micro OOF, con un valor de 0.5550, empleando volúmenes de menor resolución espacial \texttt{resize\_cube64\_multiwindowing\_separadas}. Este resultado es relevante porque indica que una arquitectura más ligera puede obtener un rendimiento competitivo cuando se combina con una representación de entrada adecuada. Por otro lado, ResNet34 ha presentado el mejor equilibrio entre etiquetas, alcanzando el mayor F1 macro OOF con la configuración \texttt{resize\_small\_hu\_m300\_1400} y la entrada \texttt{ct\_lung\_nodule\_vessels}.
+
+La Tabla \ref{tab:resultados-dl-imagen-modelos} resume la mejor configuración encontrada para cada familia de modelo. Se observa que SEResNet50 y ResNet10 han alcanzado los valores más altos de F1 micro, mientras que ResNet34 ha ofrecido el mejor F1 macro entre las mejores configuraciones por arquitectura. DenseNet121 ha quedado por debajo del resto de modelos, con un F1 micro de 0.5097 en su mejor configuración.
+
+\begin{table}[!htbp]
+\centering
+\caption{Mejor configuración de imagen para cada arquitectura según F1 micro OOF.}
+\label{tab:resultados-dl-imagen-modelos}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrcc}
+\toprule
+\textbf{Modelo} & \textbf{Preprocesado} & \textbf{Entrada} & \textbf{Batch} & \textbf{F1 micro OOF} & \textbf{F1 macro OOF} \\
+\midrule
+SEResNet50 & \texttt{resize\_cube128\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5596 & 0.4981 \\
+ResNet10 & \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule} & 16 & 0.5550 & 0.4601 \\
+ResNet34 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule\_vessels} & 4 & 0.5469 & 0.5156 \\
+ResNet18 & \texttt{resize\_cube128} & \texttt{nodule\_only\_masked\_ct} & 8 & 0.5447 & 0.5072 \\
+DenseNet121 & \texttt{resize\_medium} & \texttt{nodule\_only\_masked\_ct} & 1 & 0.5097 & 0.4374 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Al analizar el rendimiento por etiquetas de las configuraciones principales, se aprecia que la etiqueta \texttt{Sin\_complicacion} ha sido la que ha alcanzado sistemáticamente los valores de F1 más altos. En la mejor configuración global, el F1 por etiqueta ha sido de 0.3797 para \texttt{Hemorragia}, 0.4425 para \texttt{Neumotórax} y 0.6721 para \texttt{Sin\_complicacion}. Este comportamiento indica que el modelo ha capturado mejor la clase asociada a ausencia de complicación que las etiquetas de complicaciones específicas. Sin embargo, algunas configuraciones de ResNet34 han mostrado un comportamiento más equilibrado entre etiquetas. En concreto, la configuración \texttt{resnet34} con \texttt{resize\_small\_hu\_m300\_1400} y \texttt{ct\_lung\_nodule\_vessels} ha obtenido un F1 macro de 0.5328, con valores de F1 de 0.4414 para \texttt{Hemorragia}, 0.5000 para \texttt{Neumotórax} y 0.6570 para \texttt{Sin\_complicacion}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Métricas por etiqueta de configuraciones representativas basadas únicamente en imagen.}
+\label{tab:resultados-dl-imagen-etiquetas}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccc}
+\toprule
+\textbf{Modelo y configuración} & \textbf{Entrada} & \textbf{F1 Hemorragia} & \textbf{F1 Neumotórax} & \textbf{F1 Sin complicación} \\
+\midrule
+SEResNet50, \texttt{resize\_cube128\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 0.3797 & 0.4425 & 0.6721 \\
+ResNet10, \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule} & 0.3896 & 0.2921 & 0.6984 \\
+ResNet34, \texttt{resize\_small} & \texttt{ct\_lung\_nodule\_vessels} & 0.4426 & 0.4317 & 0.6725 \\
+ResNet34, \texttt{resize\_small\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 0.4414 & 0.5000 & 0.6570 \\
+ResNet18, \texttt{resize\_cube128} & \texttt{nodule\_only\_masked\_ct} & 0.3853 & 0.4638 & 0.6726 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+En cuanto al efecto del tipo de entrada, las configuraciones con las máscaras de pulmón, nódulo y vasos \texttt{ct\_lung\_nodule\_vessels} han aparecido de forma repetida entre los mejores resultados, especialmente en SEResNet50, ResNet34 y ResNet18. Esto sugiere que la combinación de la información del TC con las máscaras de pulmón, nódulo y vasos puede aportar contexto anatómico útil para la tarea. No obstante, la segunda mejor configuración global ha utilizado únicamente \texttt{ct\_lung\_nodule}, lo que indica que la inclusión de vasos no ha sido beneficiosa de forma uniforme para todas las arquitecturas. También se han obtenido resultados competitivos con \texttt{nodule\_only\_masked\_ct}, especialmente en ResNet18 y ResNet34, aunque estas configuraciones no han superado el mejor rendimiento global.
+
+Con respecto al preprocesamiento, no se ha observado una única resolución claramente dominante. En la mejor configuración global se ha empleado volúmenes de tamaño $128 \times 128 \times 128$ con ventanas HU separadas (\texttt{resize\_cube128\_multiwindowing\_separadas}), mientras que ResNet10 ha obtenido un rendimiento muy próximo con volúmenes de tamaño $64 \times 64 \times 64$ y ventanas HU separadas (\texttt{resize\_cube64\_multiwindowing\_separadas}). Por su parte, las mejores configuraciones en F1 macro se han concentrado en volúmenes de tamaño reducido $128 \times 256 \times 256$ (\texttt{resize\_small}), tanto con ventana HU como sin ella. Esto indica que la resolución espacial y la forma de representar las ventanas de intensidad afectan al comportamiento del modelo, pero su efecto depende de la arquitectura y de la entrada utilizada.
+
+En conjunto, los experimentos basados únicamente en imagen han alcanzado un rendimiento máximo de F1 micro OOF de 0.5596. Aunque este valor muestra que los modelos 3D han sido capaces de extraer cierta señal predictiva de los volúmenes de TC, el F1 macro y las métricas por etiqueta reflejan que la detección equilibrada de todas las complicaciones sigue siendo limitada. El rendimiento más alto se ha obtenido en la etiqueta \texttt{Sin\_complicacion}, mientras que las etiquetas \texttt{Hemorragia} y \texttt{Neumotórax} han presentado valores más bajos y mayor variabilidad entre configuraciones. Estos resultados justifican la exploración posterior de estrategias complementarias, como la integración multimodal con variables clínicas o el uso de modelos preentrenados en imagen médica 3D, con el objetivo de mejorar la representación aprendida y aumentar la sensibilidad hacia las complicaciones específicas.
+
+
+
+\section{Modelos multimodales con imagen 3D y variables clínicas}
+\label{sec:modelos-multimodales-imagen-clinica}
+
+Una vez evaluados los modelos basados únicamente en imagen, se ha explorado una estrategia multimodal que combina la representación aprendida a partir de los volúmenes de TC 3D con variables clínicas del paciente. El objetivo de este bloque ha sido comprobar si la información clínica aporta señal complementaria a la imagen para la predicción multietiqueta de complicaciones tras biopsia pulmonar.
+
+\subsection{Diseño experimental multimodal}
+
+Los modelos multimodales se han construido a partir de las mismas arquitecturas convolucionales tridimensionales descritas en la Sección~\ref{sec:modelos-3d-solo-imagen}. En este caso, la rama de imagen actúa como codificador volumétrico y transforma la TC preprocesada en un vector de características. A esta representación se le añade una segunda rama encargada de procesar las variables clínicas tabulares mediante capas completamente conectadas.
+
+Las representaciones generadas por ambas ramas se concatenan antes de la capa final de clasificación multietiqueta. De este modo, el modelo recibe simultáneamente información visual procedente de la TC e información clínica del paciente. La capa de salida mantiene tres unidades independientes, correspondientes a hemorragia, neumotórax y ausencia de complicación, por lo que la formulación del problema sigue siendo multietiqueta.
+
+El procedimiento de entrenamiento, validación y cálculo de métricas se ha mantenido equivalente al descrito para los modelos basados únicamente en imagen. En cada fold externo, el modelo se ha entrenado con el subconjunto de entrenamiento interno, el checkpoint se ha seleccionado mediante la validación interna y la evaluación final se ha realizado sobre el conjunto \textit{test\_outer}. Las métricas OOF se han obtenido concatenando las predicciones externas de los cinco folds, de forma que cada paciente contribuye una única vez a la estimación agregada. La métrica principal ha sido el F1 micro, complementada con F1 macro y métricas por etiqueta.
+
+\subsection{Experimentos realizados}
+
+Para acotar el coste computacional, no se ha repetido el barrido completo de arquitecturas, preprocesamientos y entradas de imagen. En su lugar, se han seleccionado retrospectivamente las configuraciones de imagen con mejor rendimiento OOF y se ha entrenado sobre ellas la variante multimodal correspondiente.
+
+En total se han completado 20 ejecuciones multimodales, todas ellas con los cinco folds externos disponibles y con predicciones OOF para 204 pacientes. Cada configuración multimodal se ha comparado con su configuración equivalente basada únicamente en imagen, manteniendo la misma arquitectura, el mismo preprocesamiento, la misma representación de entrada y el mismo tamaño de lote.
+
+\subsection{Resultados y análisis}
+
+La Tabla~\ref{tab:resultados-dl-multimodal-top} resume las veinte configuraciones multimodales con mejor rendimiento según F1 micro OOF. Además, se incluye el F1 micro obtenido por la configuración equivalente basada únicamente en imagen y la diferencia entre ambos resultados.
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\caption{Veinte mejores configuraciones multimodales y comparación con la configuración equivalente basada únicamente en imagen.}
+\label{tab:resultados-dl-multimodal-top}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrcccc}
+\toprule
+\textbf{Modelo} & \textbf{Preprocesado} & \textbf{Entrada} & \textbf{Batch} & \textbf{F1 micro MM} & \textbf{F1 macro MM} & \textbf{F1 micro im} & \textbf{$\Delta$ F1 micro} \\
+\midrule
+ResNet18 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5495 & 0.4893 & 0.5402 & +0.0094 \\
+ResNet10 & \texttt{resize\_cube64\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule} & 16 & 0.5472 & 0.4985 & 0.5240 & +0.0232 \\
+ResNet34 & \texttt{resize\_small\_multiwindowing\_separadas} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5351 & 0.5244 & 0.5339 & +0.0012 \\
+ResNet18 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule} & 4 & 0.5317 & 0.4695 & 0.5318 & -0.0001 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule} & 8 & 0.5313 & 0.4506 & 0.5516 & -0.0203 \\
+SEResNet50 & \texttt{resize\_cube128\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5270 & 0.4576 & 0.5596 & -0.0326 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 8 & 0.5263 & 0.4701 & 0.5345 & -0.0082 \\
+ResNet10 & \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule} & 16 & 0.5253 & 0.4171 & 0.5550 & -0.0297 \\
+ResNet18 & \texttt{resize\_small} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5217 & 0.4998 & 0.5336 & -0.0118 \\
+ResNet34 & \texttt{resize\_small} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5212 & 0.5148 & 0.5338 & -0.0126 \\
+ResNet34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 4 & 0.5212 & 0.4986 & 0.5465 & -0.0253 \\
+ResNet10 & \texttt{resize\_small\_hu\_m600\_1500} & \texttt{nodule\_only\_masked\_ct} & 4 & 0.5188 & 0.4974 & 0.5349 & -0.0161 \\
+ResNet18 & \texttt{resize\_cube128} & \texttt{nodule\_only\_masked\_ct} & 8 & 0.5120 & 0.5022 & 0.5447 & -0.0327 \\
+SEResNet50 & \texttt{resize\_cube128\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5085 & 0.4672 & 0.5275 & -0.0190 \\
+ResNet34 & \texttt{resize\_cube128\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 8 & 0.5053 & 0.4616 & 0.5316 & -0.0263 \\
+ResNet34 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule\_vessels} & 4 & 0.5027 & 0.4842 & 0.5469 & -0.0442 \\
+ResNet18 & \texttt{resize\_cube64\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 16 & 0.5023 & 0.4181 & 0.5275 & -0.0252 \\
+ResNet18 & \texttt{resize\_small\_hu\_m600\_1500} & \texttt{ct\_lung\_nodule} & 4 & 0.4990 & 0.4686 & 0.5385 & -0.0395 \\
+ResNet10 & \texttt{resize\_small} & \texttt{ct\_lung\_nodule} & 4 & 0.4943 & 0.4746 & 0.5250 & -0.0307 \\
+ResNet34 & \texttt{resize\_cube64\_multiwindowing\_separadas} & \texttt{ct\_lung\_nodule\_vessels} & 16 & 0.4862 & 0.3732 & 0.5365 & -0.0503 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+La mejor configuración multimodal ha sido ResNet18 con volúmenes de tamaño $128 \times 128 \times 128$ y ventana HU de $[-300, 1400]$ correspondiente a \texttt{resize\_cube128\_hu\_m300\_1400}, utilizando como entrada la TC pulmonar junto con las máscaras de pulmón, nódulo y vasos (\texttt{ct\_lung\_nodule\_vessels}). Esta configuración ha alcanzado un F1 micro OOF de 0.5495 y un F1 macro OOF de 0.4893, mejorando ligeramente a su equivalente basado únicamente en imagen, que había obtenido un F1 micro de 0.5402.
+
+Sin embargo, esta mejora no se ha observado de forma sistemática. De las 20 configuraciones multimodales evaluadas, solo 3 han mejorado el F1 micro de su configuración equivalente de imagen. La mayor ganancia se ha obtenido con ResNet10 y volúmenes de tamaño $64 \times 64 \times 64$ con ventana HU de $[-300, 1400]$ (\texttt{resize\_cube64\_hu\_m300\_1400}), donde el F1 micro ha pasado de 0.5240 a 0.5472. También se ha observado una mejora muy leve en ResNet34 con la TC restringida al nódulo y ventanas HU separadas (\texttt{resize\_small\_multiwindowing\_separadas}), aunque en este caso la diferencia ha sido prácticamente marginal.
+
+En términos agregados, el rendimiento medio de los modelos multimodales ha sido inferior al de sus equivalentes basados únicamente en imagen. El F1 micro medio multimodal ha sido aproximadamente 0.5183, frente a 0.5379 en las configuraciones de imagen correspondientes, lo que supone una diferencia media de -0.0195. Además, el mejor modelo multimodal no ha superado al mejor modelo de imagen, cuyo F1 micro OOF había alcanzado 0.5596.
+
+El análisis por etiquetas muestra que las configuraciones multimodales con mejor rendimiento han mantenido un comportamiento más favorable para la etiqueta \texttt{Sin\_complicacion}. En la mejor configuración multimodal, los valores de F1 por etiqueta han sido 0.3158 para \texttt{Hemorragia}, 0.4776 para \texttt{Neumotórax} y 0.6744 para \texttt{Sin\_complicacion}. La configuración con mayor F1 macro ha sido ResNet34 con la TC restringida al nódulo y ventanas HU separadas, alcanzando un F1 macro de 0.5244, con valores más equilibrados entre las tres etiquetas.
+
+En conjunto, los resultados indican que la incorporación de variables clínicas no ha aportado una mejora generalizada sobre los modelos basados únicamente en imagen. Aunque algunas configuraciones concretas han mostrado ganancias moderadas, la tendencia global ha sido una reducción del rendimiento medio. Por ello, la evidencia obtenida en este bloque sugiere que la fusión multimodal, al menos con la estrategia de concatenación evaluada y las variables clínicas disponibles, no mejora de forma consistente la representación aprendida a partir de la imagen 3D.
+
+
+
+
+
+% \section{Transferencia de aprendizaje y ajuste fino de modelos preentrenados}
+% 3. Modelo preentrenado con fine tuning
+
+% \subsection{Arquitecturas evaluadas}
+
+% \subsection{Configuración experimental}
+
+% \subsection{Validación y métricas}
+
+% \subsection{Experimentos realizados}
+
+% \subsection{Resultados y análisis}
+
+\section{Transferencia de aprendizaje y ajuste fino de modelos preentrenados}\label{sec:dl-preentrenamiento}
+
+Tras analizar los modelos entrenados desde una inicialización aleatoria y los modelos multimodales, se ha estudiado si la transferencia de aprendizaje podía mejorar la representación aprendida por las redes 3D. El objetivo de esta línea no ha sido repetir el barrido completo de la Sección~\ref{sec:modelos-3d-solo-imagen}, sino evaluar de forma acotada si inicializaciones obtenidas en imagen médica 3D o en datos torácicos externos aportaban una ventaja respecto a las configuraciones equivalentes entrenadas desde cero. 
+
+\subsection{Arquitecturas evaluadas}
+
+Se han considerado principalmente variantes basadas en ResNet 3D, por ser la familia que había mostrado un comportamiento competitivo en los experimentos basados únicamente en imagen y por su compatibilidad con los pesos externos disponibles. En concreto, se han evaluado modelos ResNet-18 y ResNet-34 inicializados mediante distintas estrategias de preentrenamiento. Para ello, se han probado inicializaciones procedentes de MedicalNet, basado en el trabajo Med3D para transferencia de aprendizaje en imagen médica 3D~\cite{chen2019med3d}, Models Genesis, propuesto como modelo autodidacta genérico para análisis de imagen médica 3D~\cite{zhou2019models}, y un preentrenamiento supervisado propio sobre LUNA16, un conjunto de referencia para la detección de nódulos pulmonares en TC~\cite{setio2017validation}.
+
+Las fuentes de inicialización evaluadas han sido las siguientes:
+
+\begin{itemize}
+    \item \textbf{MedicalNet}: pesos preentrenados de ResNet 3D en conjuntos de imagen médica. Se han utilizado como una inicialización genérica de dominio médico.
+    \item \textbf{Models Genesis Chest CT}: pesos preentrenados en TC torácica mediante un esquema de aprendizaje de representaciones. Se han considerado por su mayor proximidad anatómica al tipo de imagen utilizado en este trabajo.
+    \item \textbf{Preentrenamiento supervisado en LUNA16}: inicialización obtenida mediante un preentrenamiento propio y acotado sobre parches de nódulos pulmonares del conjunto LUNA16, con el objetivo de aproximar la tarea de preentrenamiento al dominio de nódulos torácicos.
+\end{itemize}
+
+En todos los casos, la capa final se ha adaptado a nuestro problema multietiqueta y el número de canales de entrada se ha ajustado a la representación de imagen utilizada. Cuando los pesos preentrenados procedían de entradas monocanal y nuestra configuración requería varios canales, se han cargado únicamente los pesos compatibles y se ha adaptado la primera convolución cuando ha sido necesario. Las capas no compatibles, especialmente la cabeza de clasificación original, se han reinicializado.
+
+\subsection{Configuración experimental}
+
+La configuración general de entrenamiento ha seguido el mismo marco descrito para los modelos 3D basados únicamente en imagen en la Sección~\ref{sec:modelos-3d-solo-imagen}. La diferencia principal ha sido la inicialización de los pesos del codificador y, en los experimentos posteriores, la estrategia de ajuste fino.
+
+Se han probado dos esquemas. En primer lugar, se ha realizado un ajuste fino directo de modelos preentrenados, manteniendo la misma separación entre entrenamiento interno, validación interna y prueba externa que en el bloque de imagen. Posteriormente, se ha evaluado una estrategia de \textit{freeze/unfreeze}: durante las primeras épocas se ha congelado el codificador y se ha entrenado únicamente la cabeza de clasificación, y después se ha descongelado el modelo completo para continuar el ajuste fino con una tasa de aprendizaje menor en el codificador. En estos experimentos se han empleado dos tasas de aprendizaje diferenciadas, $3 \cdot 10^{-5}$ para el codificador y $10^{-4}$ para la cabeza final.
+
+Además, en los experimentos posteriores de ajuste fino se ha incorporado ajuste de umbrales por etiqueta. A diferencia de los experimentos iniciales basados únicamente en imagen, en los que se ha utilizado un umbral fijo de 0,5, en estas ejecuciones los umbrales de hemorragia, neumotórax y ausencia de complicación se han seleccionado dentro de cada fold usando exclusivamente la validación interna. La selección se ha realizado maximizando el F1 micro y utilizando el F1 macro como criterio de desempate. Los umbrales así obtenidos se han aplicado después sin reajuste al conjunto \textit{test\_outer} correspondiente.
+
+El preentrenamiento propio con LUNA16 se ha planteado como una etapa previa. Se ha utilizado un subconjunto acotado de parches de nódulos, con 2048 muestras de entrenamiento y 512 de validación, una ResNet-34 3D, tamaño de lote 4 y un máximo de 20 épocas. Esta etapa ha finalizado correctamente tras 14 épocas, seleccionando la época 9, con un F1 de validación de 0.9431 en la tarea auxiliar de LUNA16. El codificador resultante se ha utilizado posteriormente como inicialización para el ajuste fino sobre nuestra cohorte.
+
+\subsection{Validación y métricas}
+
+El procedimiento de validación ha sido el mismo que el descrito en la Sección~\ref{sec:modelos-3d-solo-imagen}. En cada configuración se han utilizado cinco folds externos, con división interna del conjunto de entrenamiento externo para seleccionar el checkpoint y, cuando correspondía, los umbrales por etiqueta. La evaluación final de cada fold se ha realizado únicamente sobre \textit{test\_outer}, y las predicciones externas se han concatenado para calcular las métricas OOF.
+
+Por tanto, las métricas principales han sido también F1 micro OOF y F1 macro OOF, complementadas con el F1 por etiqueta.
+
+\subsection{Experimentos realizados}
+
+La Tabla~\ref{tab:dl-pretraining-experimentos} resume los experimentos de preentrenamiento y ajuste fino realizados. El diseño se ha organizado en tres grupos principales. En primer lugar, se han evaluado inicializaciones externas en una configuración prioritaria basada en ResNet-18 y entrada multicanal. En segundo lugar, se han comparado MedicalNet y Models Genesis en configuraciones representativas de ResNet-34 y codificadores 3D sobre entradas utilizadas previamente en los experimentos de imagen. Por último, se han estudiado entradas monocanal más próximas a las condiciones de preentrenamiento de los modelos externos, junto con una inicialización específica obtenida mediante preentrenamiento supervisado propio sobre LUNA16.
+
+\begin{table}[!htbp]
+\centering
+\caption{Resumen de los experimentos de transferencia de aprendizaje evaluados.}
+\label{tab:dl-pretraining-experimentos}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\toprule
+\textbf{Grupo experimental} & \textbf{Inicialización} & \textbf{Modelo base} & \textbf{Objetivo} \\
+\midrule
+Evaluación inicial de transferencia & MedicalNet & ResNet-18 & Evaluar una inicialización médica genérica en una configuración prioritaria \\
+Evaluación inicial de transferencia & Models Genesis Chest CT & Codificador 3D & Evaluar una inicialización específica de TC torácica en una configuración prioritaria \\
+Ajuste fino sobre configuraciones representativas & MedicalNet & ResNet-34 & Comparar la transferencia médica genérica con modelos equivalentes entrenados desde cero \\
+Ajuste fino sobre configuraciones representativas & Models Genesis Chest CT & Codificador 3D & Comparar la transferencia basada en TC torácica con modelos equivalentes entrenados desde cero \\
+Entradas monocanal y ajuste fino & MedicalNet & ResNet-34 & Reducir la distancia entre la entrada del TFM y las condiciones del preentrenamiento externo \\
+Entradas monocanal y ajuste fino & Models Genesis Chest CT & Codificador 3D & Evaluar entradas de TC más compatibles con los pesos externos \\
+Preentrenamiento supervisado propio & LUNA16 & ResNet-34 & Adaptar la inicialización al dominio de nódulos pulmonares mediante una etapa previa supervisada \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+En conjunto, estos experimentos permiten analizar si la inicialización mediante pesos externos o mediante un preentrenamiento propio aporta una ventaja frente al entrenamiento desde cero. La comparación se ha realizado manteniendo el mismo esquema de validación externa por folds utilizado en los modelos basados únicamente en imagen.
+
+\subsection{Resultados y análisis}
+
+La Tabla~\ref{tab:dl-pretraining-resultados} muestra los resultados OOF de los experimentos de transferencia de aprendizaje y ajuste fino. Cuando existe una configuración equivalente entrenada desde cero, se incluye también su rendimiento para facilitar la comparación directa. Las filas sin valor de referencia corresponden a entradas para las que no se dispone de un baseline scratch exactamente equivalente dentro de los experimentos previos considerados.
+
+\begin{table}[!htbp]
+\centering
+\scriptsize
+\caption{Resultados OOF de los experimentos de transferencia de aprendizaje.}
+\label{tab:dl-pretraining-resultados}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llllrrrr}
+\toprule
+\textbf{Inicialización} & \textbf{Modelo} & \textbf{Preprocesado} & \textbf{Entrada} & \textbf{F1 micro} & \textbf{F1 macro} & \textbf{F1 micro scratch} & \textbf{$\Delta$ micro} \\
+\midrule
+MedicalNet & ResNet-18 & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 0.4824 & 0.4567 & -- & -- \\
+Models Genesis & Codificador 3D & \texttt{resize\_cube128\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 0.4444 & 0.4278 & -- & -- \\
+MedicalNet & ResNet-34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 0.4891 & 0.3986 & 0.5465 & -0.0575 \\
+Models Genesis & Codificador 3D & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{ct\_lung\_nodule\_vessels} & 0.5240 & 0.4364 & 0.5465 & -0.0225 \\
+Models Genesis & Codificador 3D & \texttt{resize\_small\_multiwindowing} & \texttt{nodule\_only\_masked\_ct} & 0.5171 & 0.4863 & 0.5339 & -0.0168 \\
+MedicalNet & ResNet-34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{nodule\_only\_masked\_ct} & 0.5449 & 0.4959 & 0.5198 & +0.0250 \\
+MedicalNet & ResNet-34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{lung\_only\_masked\_ct} & 0.5336 & 0.5004 & -- & -- \\
+Models Genesis & Codificador 3D & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{nodule\_only\_masked\_ct} & 0.5276 & 0.4759 & 0.5198 & +0.0077 \\
+Models Genesis & Codificador 3D & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{lung\_only\_masked\_ct} & 0.4916 & 0.3894 & -- & -- \\
+LUNA16 & ResNet-34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{nodule\_only\_masked\_ct} & 0.5225 & 0.4741 & 0.5198 & +0.0027 \\
+LUNA16 & ResNet-34 & \texttt{resize\_small\_hu\_m300\_1400} & \texttt{lung\_only\_masked\_ct} & 0.4936 & 0.4125 & -- & -- \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Los resultados no muestran una mejora consistente respecto a los modelos entrenados desde cero. En las configuraciones con comparación directa, MedicalNet y Models Genesis reducen el rendimiento al utilizar la entrada compuesta por TC pulmonar, pulmón, nódulo y vasos. En concreto, MedicalNet alcanza un F1 micro de 0.4891 frente a 0.5465 en la configuración scratch equivalente, mientras que Models Genesis obtiene 0.5240. También se observa una reducción en la configuración con ventanas HU separadas y TC restringida al nódulo, donde Models Genesis obtiene un F1 micro de 0.5171 frente a 0.5339 en el modelo entrenado desde cero.
+
+Las mejoras en F1 micro se concentran en las entradas monocanal de TC restringida al nódulo. MedicalNet alcanza un F1 micro de 0.5449 frente a 0.5198 en su baseline scratch equivalente, y Models Genesis obtiene 0.5276 frente a 0.5198. Sin embargo, estas mejoras no van acompañadas de una mejora del F1 macro: en MedicalNet el F1 macro pasa de 0.5043 en el modelo scratch a 0.4959, y en Models Genesis desciende a 0.4759. Por tanto, aunque estas configuraciones aumentan ligeramente el rendimiento agregado micro, no mejoran el equilibrio entre etiquetas.
+
+El preentrenamiento propio en LUNA16 tampoco aporta una ganancia relevante. La comparación directa en \texttt{nodule\_only\_masked\_ct} muestra un incremento muy pequeño del F1 micro, de 0.5198 a 0.5225, acompañado de una reducción del F1 macro de 0.5043 a 0.4741. La configuración \texttt{lung\_only\_masked\_ct} obtiene un F1 micro de 0.4936 y un F1 macro de 0.4125, valores inferiores a los mejores resultados de imagen entrenados desde cero.
+
+El análisis por etiquetas refuerza esta interpretación. Las configuraciones preentrenadas mantienen el patrón observado en los modelos de imagen: la etiqueta \texttt{Sin\_complicacion} es la más sencilla de identificar, mientras que hemorragia y neumotórax presentan valores más bajos. En algunas configuraciones se mejora una etiqueta concreta, pero no se observa una mejora simultánea y estable en las tres salidas. En especial, las mejoras marginales de F1 micro se asocian a descensos del F1 macro, lo que indica que el beneficio agregado no se traduce en una clasificación más equilibrada.
+
+En conjunto, la transferencia de aprendizaje y el ajuste fino de modelos preentrenados no superan de forma consistente a los modelos entrenados desde cero. La evidencia obtenida sugiere que la diferencia entre las tareas de preentrenamiento y el objetivo clínico multietiqueta, junto con el tamaño reducido de la cohorte y el desequilibrio entre etiquetas, limita la utilidad de estas inicializaciones.
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Baseline 2.5D}
+\textcolor{red}{Probar?}
+
+% \subsection{Arquitecturas evaluadas}
+
+% \subsection{Configuración experimental}
+
+% \subsection{Validación y métricas}
+
+% \subsection{Experimentos realizados}
+
+% \subsection{Resultados y análisis}
+
+
+
+\section{OPCIONAL: Preentrenamiento autosupervisado con volúmenes sanos}
+\textcolor{red}{Pretraining autosupervisado con volúmenes sanos, si la procedencia y el protocolo son compatibles. Quiero intentar hacer algo para utilizar los volumenes sanos que nos dieron (tenemos creo que 75). }
+
+% \subsection{Arquitecturas evaluadas}
+
+% \subsection{Configuración experimental}
+
+% \subsection{Validación y métricas}
+
+% \subsection{Experimentos realizados}
+
+% \subsection{Resultados y análisis}

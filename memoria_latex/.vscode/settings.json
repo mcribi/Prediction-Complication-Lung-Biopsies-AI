@@ -1,0 +1,29 @@
+{
+    "latex-workshop.latex.tools": [
+        {
+            "name": "latexmk-tinytex",
+            "command": "/mnt/homeGPU/mcribilles/.TinyTeX/bin/x86_64-linux/latexmk",
+            "env": {
+                "PATH": "/mnt/homeGPU/mcribilles/.TinyTeX/bin/x86_64-linux:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            },
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-pdf",
+                "%DOC%"
+            ]
+        }
+    ],
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "latexmk (TinyTeX)",
+            "tools": [
+                "latexmk-tinytex"
+            ]
+        }
+    ],
+    "latex-workshop.latex.recipe.default": "first",
+    "latex-workshop.linting.chktex.enabled": true,
+    "latex-workshop.linting.chktex.exec.path": "/mnt/homeGPU/mcribilles/.TinyTeX/bin/x86_64-linux/chktex"
+}
