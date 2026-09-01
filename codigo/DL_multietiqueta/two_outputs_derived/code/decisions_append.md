@@ -1,0 +1,24 @@
+# Decisiones de la repetición DL con dos salidas
+
+- Se han definido como únicas salidas independientes `Hemorragia` y `Neumotórax`.
+- `Sin_complicacion` se ha definido como estado derivado cuando ambas salidas son cero.
+- Se han conservado los cinco folds externos y la validación interna de los experimentos originales.
+- El checkpoint se ha seguido seleccionando con el criterio histórico sobre `val_inner` a umbral 0,5 para no introducir otro cambio en el entrenamiento.
+- Los umbrales se han ajustado después de seleccionar el checkpoint, utilizando solo sus predicciones en `val_inner`.
+- Se ha definido una rejilla por etiqueta entre 0,10 y 0,90 con paso 0,05.
+- Se han guardado resultados paralelos con umbral fijo 0,5 y con umbrales ajustados.
+- `test_outer` no se ha utilizado para seleccionar checkpoints, configuraciones ni umbrales.
+- Se ha requerido la presencia de los cinco folds antes de calcular o interpretar agregados.
+- Las desviaciones entre folds se han calculado como desviaciones estándar muestrales (`ddof=1`).
+- Se ha exigido una tabla clínica fuente de 210 pacientes; el helper histórico ha excluido a `27HASD` por presentar únicamente `Derrame pleural`, fuera de las dos dianas, dejando 209 pacientes elegibles y 204 con imagen completa.
+- Los experimentos históricos no se han sobrescrito; la nueva raíz es `two_outputs_derived`.
+- Los trabajos SLURM se han configurado para `dgx2,dgx`, una GPU por tarea y cuatro días.
+- Los barridos largos dependerán de un smoke test mediante `afterok`.
+- Se han repetido los pilotos directos MedicalNet ResNet-18 y Models Genesis, además de las variantes ResNet-34 `freeze/unfreeze`, rescate CT simple y LUNA16 observadas en los resultados históricos.
+- En las variantes `freeze/unfreeze`, el encoder se ha congelado durante cinco épocas, incluidas las estadísticas de BatchNorm, y después se ha descongelado para el ajuste fino completo.
+- Se ha exigido que la carga de pesos preentrenados incluya la primera convolución y al menos diez tensores compatibles.
+- Las configuraciones de transferencia han requerido una cohorte efectiva exacta de 204 pacientes, coherente con las ejecuciones históricas auditadas.
+- El top-20 multimodal histórico se ha conservado únicamente como análisis exploratorio retrospectivo, no como selección confirmatoria anidada independiente.
+- El checkpoint LUNA16 se ha fijado por ruta y SHA-256 para impedir que tareas independientes seleccionen inicializaciones distintas por fecha de modificación.
+- El collector se ha acotado mediante el instante de lanzamiento y ha exigido que todos los artefactos agregados pertenezcan al lote actual.
+- Los JobID se han registrado inmediatamente después de cada `sbatch`, de modo que una sumisión parcial siga siendo trazable.

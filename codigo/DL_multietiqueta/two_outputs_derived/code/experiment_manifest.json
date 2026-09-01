@@ -1,0 +1,113 @@
+{
+  "experiment_family": "dl_two_outputs_derived_no_complication",
+  "primary_targets": [
+    "Hemorragia",
+    "Neumotórax"
+  ],
+  "derived_state": {
+    "name": "Sin_complicacion",
+    "definition": "Hemorragia == 0 and Neumotórax == 0",
+    "independent_output": false,
+    "continuous_score": null,
+    "roc_auc_and_average_precision": "undefined_without_an_independent_calibrated_score"
+  },
+  "threshold_protocol": {
+    "checkpoint_selection": "historical val_inner F1 micro at 0.5",
+    "selection_split": "val_inner",
+    "grid": {
+      "start": 0.1,
+      "stop": 0.9,
+      "step": 0.05
+    },
+    "per_label": true,
+    "tie_break": [
+      "closest_to_0.5",
+      "lowest_threshold"
+    ],
+    "test_outer_used_for_selection": false,
+    "reported_branches": [
+      "fixed_0.5",
+      "val_inner_tuned"
+    ]
+  },
+  "cross_validation": {
+    "outer_folds": 5,
+    "inner_validation": true,
+    "required_complete_folds": [1, 2, 3, 4, 5],
+    "fold_standard_deviation": "sample_sd_ddof_1",
+    "oof_patient_uniqueness_required": true
+  },
+  "cohort": {
+    "clinical_source_rows": 210,
+    "target_eligible_patients": 209,
+    "off_target_only_excluded_patients": ["27HASD"],
+    "off_target_exclusion_reason": "Derrame pleural as the only complication",
+    "effective_imaging_patients": 204
+  },
+  "scope": {
+    "image_only": {
+      "models": [
+        "resnet10",
+        "resnet18",
+        "resnet34",
+        "seresnet50",
+        "densenet121"
+      ],
+      "preprocessing_groups": [
+        "cube64",
+        "cube128",
+        "small",
+        "medium"
+      ],
+      "expected_configurations": 224
+    },
+    "multimodal": {
+      "configuration_source": "historical top20 manifest",
+      "mode": "multimodal",
+      "expected_configurations": 20,
+      "evaluation_scope": "exploratory_retrospective",
+      "selection_limitation": "The historical top20 image configurations were selected using outer-fold image results; multimodal outer metrics are not a fully independent nested estimate."
+    },
+    "transfer_learning": {
+      "direct_pilots": [
+        "medicalnet_resnet18",
+        "genesis_chest_ct"
+      ],
+      "freeze_unfreeze_profiles": {
+        "phase2": {
+          "pretrainings": ["medicalnet", "genesis_chest_ct"],
+          "configurations_per_pretraining": 2,
+          "batch_size": 4
+        },
+        "ct_simple": {
+          "pretrainings": ["medicalnet", "genesis_chest_ct"],
+          "configurations_per_pretraining": 2,
+          "batch_size": 2
+        },
+        "luna16": {
+          "pretrainings": ["luna16_resnet34"],
+          "configurations_per_pretraining": 2,
+          "batch_size": 4
+        }
+      },
+      "freeze_epochs": 5,
+      "expected_array_tasks": 10,
+      "expected_effective_cohort": 204,
+      "pinned_luna16_checkpoint": "/mnt/homeGPU/mcribilles/tfm/codigo/DL_multietiqueta/pretrained_finetuning/runs/luna16_nodule_pretraining_real/20260803_100315_resnet34_bounded_real/best_encoder_state_dict.pt",
+      "pinned_luna16_sha256": "648c3ee1e4d34f83f0ce5ec49c5657724a4de42b32782720fd83393ffdb04778"
+    }
+  },
+  "slurm": {
+    "partitions": "dgx2,dgx",
+    "time_limit": "4-00:00:00",
+    "long_jobs_depend_on_smoke_test": true,
+    "image_max_concurrent": 2,
+    "multimodal_max_concurrent": 2,
+    "direct_pretraining_max_concurrent": 1,
+    "freeze_pretraining_max_concurrent": 1,
+    "maximum_global_concurrent_long_jobs": 6,
+    "concurrency_basis": "14 of 24 GPUs occupied immediately before launch preparation",
+    "collector_scope": "artifacts with mtime at or after the recorded launch epoch",
+    "incremental_job_registry": true
+  }
+}

@@ -171,3 +171,51 @@ codigo/clasif_binaria/config/valid_configurations.HUGE.json
 
 # --- Configuracion local con rutas absolutas del servidor ---
 /.vscode/
+
+# --- Proteccion integral de informacion confidencial ---
+# La memoria y sus figuras no se publican en este repositorio.
+/memoria_latex/
+
+# Datos clinicos, identificadores y tablas a nivel de paciente.
+/data/
+/dataset/
+/datasets/
+/codigo/**/data/
+/codigo/**/datasets/
+**/*patient*.csv
+**/*paciente*.csv
+**/*predictions*.csv
+**/*split_assignments*.csv
+**/*fold_assignments*.csv
+**/*manifest*.csv
+
+# Resultados, ejecuciones, checkpoints y artefactos regenerables.
+**/runs/
+**/smoke_runs/
+**/smoke/
+**/outputs/
+**/predictions/
+**/checkpoints/
+/codigo/DL_multietiqueta/two_outputs_derived/image_only/
+/codigo/DL_multietiqueta/two_outputs_derived/multimodal/
+/codigo/DL_multietiqueta/two_outputs_derived/pretrained_finetuning/
+/codigo/DL_multietiqueta/two_outputs_derived/subgroup_model_experiment_*/
+/codigo/DL_multietiqueta/two_outputs_derived/submitted_batches/
+/codigo/DL_multietiqueta/two_outputs_derived/*job_id*.txt
+/codigo/DL_multietiqueta/baseline_25d/*.csv
+/codigo/radiomica_multietiqueta/radiomic_results_*/
+/codigo/radiomica_multietiqueta/radiomic_tables_*/
+/codigo/radiomica_multietiqueta/radiomica_two_outputs_*/
+/codigo/subgroup_discovery/subgroup_radiomics_ml_*/runs/
+/codigo/subgroup_discovery/subgroup_radiomics_ml_*/smoke/
+
+# Credenciales y claves locales.
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*credentials*
+*secret*
+
