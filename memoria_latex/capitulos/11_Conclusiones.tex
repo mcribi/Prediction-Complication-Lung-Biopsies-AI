@@ -1,0 +1,44 @@
+\chapter{Conclusiones}\label{chap:conclusiones}
+
+% Este capítulo sintetiza los principales resultados obtenidos, valora el cumplimiento de los objetivos planteados y recoge las limitaciones del estudio y las líneas de trabajo futuras.
+
+Este trabajo ha abordado la predicción de hemorragia y neumotórax tras una biopsia pulmonar guiada por tomografía computarizada. Se trata de un problema clínico complejo en el que la estimación previa del riesgo podría contribuir, en el futuro, a una planificación más informada del procedimiento. Para estudiarlo se han combinado datos clínicos, imágenes de TC, características radiómicas y descriptores geométricos, evaluando tanto modelos predictivos como estrategias orientadas a comprender mejor la información disponible.
+
+Una de las principales conclusiones es la importancia de la calidad y la trazabilidad de los datos. Durante su preparación se detectaron volúmenes repetidos asociados a registros tabulares diferentes, lo que podría introducir relaciones incorrectas entre la imagen, las características clínicas y las etiquetas. Estos casos se eliminaron de los análisis basados en imagen. Este hallazgo muestra que, en un estudio multimodal, no basta con comprobar cada fuente de información por separado, sino que también es necesario verificar cuidadosamente la correspondencia entre pacientes, imágenes, segmentaciones y datos clínicos.
+
+Los experimentos realizados han permitido caracterizar el comportamiento de distintas representaciones y estrategias de modelado. La mejor configuración radiómica ha combinado características básicas y variables clínicas, mientras que los modelos tridimensionales han presentado una mayor dependencia de la arquitectura, el preprocesamiento y las regiones anatómicas incluidas. Los rendimientos de ambos enfoques han sido del mismo orden. En conjunto, el rendimiento sigue siendo limitado, ninguna estrategia ha resultado uniformemente superior y el aumento de la complejidad no ha producido mejoras sistemáticas.
+
+El estudio de formulaciones alternativas tampoco ha identificado una solución que mejore de forma consistente el rendimiento. La incorporación de información clínica, el ajuste de umbrales, la transferencia de aprendizaje y los métodos de aprendizaje positivo y no etiquetado han aportado mejoras puntuales, pero estas no se han mantenido de manera uniforme entre complicaciones, representaciones y métricas. En el caso de PU learning, su interpretación está condicionada por la calidad de las etiquetas disponibles, que podría no ser igual en todos los pacientes. Cuando se ha registrado alguna complicación, es posible que un seguimiento más estrecho haya permitido descartar con mayor fiabilidad otros eventos, mientras que entre los pacientes clasificados como sin complicaciones podrían existir episodios leves no detectados o no documentados. Esta hipótesis no puede comprobarse con la información disponible, pero cuestiona que todos los casos sin una etiqueta positiva presenten el mismo grado de incertidumbre.
+
+El descubrimiento de subgrupos ha aportado una lectura complementaria de los resultados al identificar asociaciones entre determinadas variables clínicas y geométricas y las complicaciones estudiadas. Entre ellas destacan el tamaño del nódulo y su profundidad respecto a la pleura.
+
+La predicción se ha planteado deliberadamente antes de la biopsia, utilizando únicamente la información disponible en ese momento. Sin embargo, la literatura indica que la aparición de complicaciones también puede estar relacionada con factores conocidos durante la planificación o la ejecución del procedimiento. Yang et al. \cite{yang2026machine} incorporaron variables como el contacto pleural y la profundidad de punción para predecir eventos adversos graves, mientras que un metaanálisis de 36 estudios y 23.104 pacientes relacionó la realización de múltiples punciones pleurales con un mayor riesgo de neumotórax \cite{Huo2020Pneumothorax}. La profundidad real de punción y el número de punciones pleurales no están disponibles antes de la intervención y tampoco pueden sustituirse directamente por los descriptores geométricos calculados en este trabajo. Por tanto, el rendimiento obtenido podría reflejar no solo las dificultades asociadas con la cohorte y el modelado, sino también que una parte del riesgo depende de circunstancias que todavía no se han producido en el momento de realizar la predicción. Los datos actuales no permiten determinar hasta qué punto las complicaciones pueden anticiparse empleando exclusivamente información prebiopsia.
+
+Las técnicas de explicabilidad han ayudado a analizar críticamente el comportamiento de los modelos. SHAP ha permitido identificar las características con mayor contribución a las predicciones, mientras que Grad-CAM ha mostrado que las redes no siempre concentran su atención en regiones anatómicas claramente interpretables. Estos resultados no permiten establecer relaciones clínicas causales, pero sí han resultado útiles para detectar posibles artefactos, revisar las decisiones de los modelos y señalar aspectos que requieren una validación adicional.
+
+La interpretación de los resultados está condicionada principalmente por el tamaño de la cohorte, el desbalanceo de las complicaciones y la ausencia de validación externa. Por ello, los modelos desarrollados no pueden considerarse todavía herramientas preparadas para su aplicación clínica. Sin embargo, el trabajo ha permitido construir un marco reproducible, comparar distintas fuentes de información e identificar tanto las estrategias más prometedoras como los principales obstáculos que deben resolverse para avanzar en este problema.
+
+A partir de estos resultados, se plantean las siguientes líneas de trabajo futuro:
+
+\begin{itemize}
+
+    \item \textbf{Aprendizaje federado e integración de datos de distintos hospitales}. Este enfoque permitiría entrenar modelos con cohortes más amplias y diversas sin centralizar los datos sensibles, además de facilitar la validación en centros independientes.
+
+    \item \textbf{Reforzar la calidad y la trazabilidad de los datos}, mediante controles automáticos de duplicados, la verificación de la correspondencia entre modalidades y la revisión clínica de los registros dudosos.
+
+    \item \textbf{Incorporar variables relacionadas con el procedimiento}. El registro prospectivo de la profundidad y el ángulo de punción, la longitud de la trayectoria de la aguja, el contacto pleural, el número de punciones pleurales, los reajustes y las muestras obtenidas permitiría distinguir qué parte del riesgo es previa a la biopsia y cuál depende de su ejecución. Esta información también permitiría desarrollar un modelo en dos etapas, con una estimación preoperatoria y una actualización intraoperatoria basada en el desarrollo real del procedimiento.
+
+    \item \textbf{Estudiar la incertidumbre de las etiquetas}. Podrían ocultarse de forma controlada algunos positivos durante el entrenamiento para comparar la robustez de PU learning y del aprendizaje supervisado ante etiquetas incompletas, sin asumir que existan complicaciones no registradas en la cohorte actual.
+
+    \item \textbf{Aprovechar datos no etiquetados}, mediante técnicas de preentrenamiento autosupervisado sobre volúmenes de TC compatibles con el dominio del problema.
+
+    \item \textbf{Analizar el efecto del equipo y de los parámetros de adquisición}. La información disponible en los metadatos DICOM permitiría evaluar el rendimiento por equipo y protocolo, así como detectar posibles asociaciones entre diferencias técnicas y complicaciones que puedan afectar a la generalización.
+
+    \item \textbf{Aprendizaje con mecanismos de atención y explicabilidad}. Se propone incorporar mecanismos de atención y nuevas técnicas de explicabilidad para analizar las regiones utilizadas por los modelos, teniendo en cuenta que la atención no garantiza por sí misma una interpretación clínicamente válida.
+
+\end{itemize}
+
+En conjunto, este trabajo ha permitido delimitar las posibilidades y dificultades de anticipar las complicaciones de la biopsia pulmonar a partir de información disponible antes del procedimiento. Aunque los resultados no permiten plantear todavía una aplicación clínica, proporcionan una base metodológica reproducible y señalan qué datos y validaciones serán necesarios para determinar si puede alcanzarse una predicción prebiopsia más fiable.
+
+
+\endinput

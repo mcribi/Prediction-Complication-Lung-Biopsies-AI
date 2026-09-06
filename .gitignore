@@ -67,8 +67,7 @@
 .ipynb_checkpoints/
 
 # --- Backups y temporales ---
-*.bak
-*.bak_*
+*.bak*
 *~
 .tmp
 /tmp_probe_*
@@ -166,15 +165,21 @@ codigo/clasif_binaria/config/valid_configurations.HUGE.json
 /memoria_latex/proyecto.lot
 /memoria_latex/proyecto.synctex.gz
 /memoria_latex/proyecto.toc
-/memoria_latex/imagenes/eda/control_visual_calidad_ct.png
+/memoria_latex/proyecto.out
+/memoria_latex/.vscode/
+/memoria_latex/prefacios/prefacio.tex
+/memoria_latex/imagenes/eda/control_visual_calidad_ct*.png
 /memoria_latex/imagenes/eda/hu_ejemplos.png
+/memoria_latex/imagenes/explicabilidad/gradcam_*.jpg
+/memoria_latex/imagenes/explicabilidad/photo_*.jpg
+/memoria_latex/imagenes/explicabilidad/shap_local_representative_*
 
 # --- Configuracion local con rutas absolutas del servidor ---
 /.vscode/
 
 # --- Proteccion integral de informacion confidencial ---
-# La memoria y sus figuras no se publican en este repositorio.
-/memoria_latex/
+# La fuente LaTeX y las figuras publicas saneadas de la memoria se versionan.
+# Las copias, productos de compilacion y figuras identificables se excluyen arriba.
 
 # Datos clinicos, identificadores y tablas a nivel de paciente.
 /data/
@@ -188,6 +193,7 @@ codigo/clasif_binaria/config/valid_configurations.HUGE.json
 **/*split_assignments*.csv
 **/*fold_assignments*.csv
 **/*manifest*.csv
+*.npz
 
 # Resultados, ejecuciones, checkpoints y artefactos regenerables.
 **/runs/
@@ -202,12 +208,23 @@ codigo/clasif_binaria/config/valid_configurations.HUGE.json
 /codigo/DL_multietiqueta/two_outputs_derived/subgroup_model_experiment_*/
 /codigo/DL_multietiqueta/two_outputs_derived/submitted_batches/
 /codigo/DL_multietiqueta/two_outputs_derived/*job_id*.txt
+/codigo/DL_multietiqueta/two_outputs_derived/tables/
 /codigo/DL_multietiqueta/baseline_25d/*.csv
 /codigo/radiomica_multietiqueta/radiomic_results_*/
 /codigo/radiomica_multietiqueta/radiomic_tables_*/
 /codigo/radiomica_multietiqueta/radiomica_two_outputs_*/
+/codigo/radiomica_multietiqueta/shap_radiomics_final_20260903/vendor/
+/codigo/radiomica_multietiqueta/shap_radiomics_final_20260903/output/
+/codigo/radiomica_multietiqueta/shap_radiomics_final_20260903/R07_20260905/output_final/
+/codigo/radiomica_multietiqueta/shap_radiomics_final_20260903/R07_20260905/output_smoke/
+/codigo/radiomica_multietiqueta/shap_radiomics_final_20260903/R07_20260905/output_publication/
+/codigo/radiomica_multietiqueta/shap_radiomics_final_20260903/R07_20260905/COPY_VERIFICATION.json
 /codigo/subgroup_discovery/subgroup_radiomics_ml_*/runs/
 /codigo/subgroup_discovery/subgroup_radiomics_ml_*/smoke/
+
+# Notebooks y estados locales que contienen selecciones o visualizaciones por paciente.
+/codigo/eda/visualizar_slices_centrales_pacientes.ipynb
+/codigo/pu_learning/**/active_run.env
 
 # Credenciales y claves locales.
 .env.*

@@ -1,0 +1,480 @@
+\chapter{Descubrimiento de subgrupos}\label{chap:subgroup_discovery}
+
+Este capítulo aborda el descubrimiento de subgrupos como una estrategia complementaria para interpretar los patrones presentes en la cohorte y explorar su relación con las complicaciones.
+
+\section{Objetivo y diseño del análisis}
+El análisis de descubrimiento de subgrupos se ha planteado como una extensión descriptiva del estudio predictivo. Mientras que los modelos de clasificación de los capítulos anteriores han tenido como objetivo predecir las complicaciones de nuevos pacientes, este bloque se ha centrado en identificar subgrupos de pacientes con características comunes en los que la frecuencia o la combinación de complicaciones difiere de la observada en la cohorte completa. El objetivo no ha sido construir un nuevo clasificador ni establecer relaciones causales, sino obtener reglas comprensibles que permitan explorar qué combinaciones de características clínicas y geométricas aparecen asociadas con cada resultado.
+
+\subsection{Cohortes, variables y objetivos}
+
+El estudio se estructuró en torno a dos cohortes principales y cuatro representaciones experimentales. La cohorte clínica completa estuvo formada por 210 pacientes y se utilizó para el análisis basado únicamente en variables clínicas preprocedimentales. Por otra parte, la subcohorte con información geométrica completa incluyó 201 pacientes y permitió definir las representaciones \textit{clinical\_matched}, \textit{geometry\_only} y \textit{clinical\_geometry}. Esta separación permitió evaluar de forma diferenciada la información clínica, la información geométrica y su combinación, manteniendo comparaciones homogéneas cuando se incorporaban variables geométricas.
+
+Las variables descriptivas se han obtenido de la tabla categorizada presentada en el Capítulo \ref{chap:eda}. Dado el tamaño de la cohorte, mantener todos los indicadores resultantes de la categorización habría generado un espacio de búsqueda excesivamente amplio y habría favorecido la aparición de reglas demasiado específicas o sustentadas por categorías con escaso soporte. Por este motivo, se ha construido una representación clínica de menor dimensionalidad mediante la agrupación de indicadores pertenecientes a un mismo ámbito clínico. En concreto, \texttt{Tabac\_any} integra tabaquismo activo, extabaquismo y tabaquismo pasivo; \texttt{CardioRisk} agrupa hipertensión arterial, cardiopatía, síndrome coronario agudo con elevación del segmento ST e hiperuricemia; \texttt{Enfisema\_any} reúne el enfisema general y sus variantes centrolobulillar, panacinar y paraseptal; \texttt{Dislipemia\_any} combina dislipemia, hipercolesterolemia e hiperlipemia; \texttt{DM\_any} integra diabetes mellitus general, tipo 1 y tipo 2; y \texttt{Fibrosis\_any} agrupa fibrosis y fibrosis pulmonar. Cada variable agrupada toma el valor uno cuando está presente al menos uno de sus indicadores de origen. También se han conservado \texttt{Sin\_factor\_de\_riesgo} y \texttt{Sin\_patología\_pulmonar}, que identifican, respectivamente, a los pacientes sin ninguno de los factores de riesgo o de las patologías pulmonares registrados. Los diagnósticos individuales no incluidos en esta representación no se han utilizado como descriptores independientes, con el fin de reducir la redundancia y evitar antecedentes excesivamente específicos y potencialmente inestables. Esta transformación se ha definido antes de ejecutar el algoritmo y no se ha basado en las métricas de las reglas obtenidas.
+
+Por tanto, la representación resultante ha incluido inicialmente 13 variables. Posteriormente, \texttt{Sexo\_binaria} se ha excluido de todas las búsquedas siguiendo el criterio proporcionado por el equipo médico, según el cual el tipo de complicación no depende del sexo del paciente. Por consiguiente, el conjunto utilizado finalmente ha contenido 12 predictores clínicos.
+
+La incorporación de variables geométricas se ha considerado especialmente necesaria en este análisis porque, a diferencia de los enfoques de deep learning y radiómica, el descubrimiento de subgrupos se ha realizado exclusivamente a partir de descriptores tabulares. En los primeros, la representación se construye a partir de los propios volúmenes y máscaras, por lo que puede incorporar información morfológica y espacial de la lesión. En cambio, esta información no estaría disponible para construir las reglas si no se añadiera explícitamente a la tabla. Además, el equipo médico ha señalado que el tamaño del nódulo y, especialmente, su posición respecto a la pleura son factores anatómicos relevantes para caracterizar el procedimiento, lo que ha justificado su inclusión con el objetivo de obtener subgrupos clínicamente más informativos.
+
+Como complemento a la información clínica, se han obtenido tres variables geométricas destinadas a describir de forma sencilla el tamaño del nódulo y su posición con respecto a la pleura. Estas variables no corresponden a características radiómicas de intensidad o textura, sino a medidas morfológicas y espaciales calculadas directamente sobre las máscaras tridimensionales del nódulo y del pulmón. Para ello se han utilizado las máscaras NIfTI generadas durante el preprocesamiento de las imágenes, conservando el espaciado físico de cada volumen para expresar todas las distancias en milímetros. Tanto la máscara pulmonar como la nodular se han binarizado considerando como pertenecientes a la región de interés los vóxeles con un valor superior a 0,5.
+
+La primera variable, denominada \texttt{tamano\_nodulo\_mm}, corresponde al diámetro equivalente del nódulo. En primer lugar, su volumen físico se ha calculado como
+
+\[
+V_N =
+N_{\mathrm{vox}}
+\Delta_x \Delta_y \Delta_z,
+\]
+
+donde \(V_N\) es el volumen del nódulo, \(N_{\mathrm{vox}}\) es el número de vóxeles incluidos en su máscara y \(\Delta_x\), \(\Delta_y\) y \(\Delta_z\) representan el espaciado del volumen en cada eje. A partir de este volumen se ha obtenido el diámetro de una esfera con el mismo volumen:
+
+\[
+d_{\mathrm{eq}} =
+\left(
+\frac{6V_N}{\pi}
+\right)^{1/3}.
+\]
+
+Esta medida proporciona una representación escalar del tamaño del nódulo que tiene en cuenta su extensión tridimensional, en lugar de depender únicamente del diámetro observado en un corte concreto.
+
+Las otras dos variables describen la profundidad del nódulo respecto a la pleura, aproximada mediante el límite exterior de la máscara pulmonar. Para calcularlas se ha aplicado una transformación euclídea de distancia sobre el interior del pulmón, incorporando el espaciado de los vóxeles. De este modo, a cada posición interior se le ha asignado la distancia física hasta el vóxel exterior más cercano. La orientación de la máscara pulmonar se ha comprobado mediante su solapamiento con el nódulo y se ha invertido cuando ha sido necesario.
+
+La variable \texttt{profundidad\_min\_pleura\_mm} se ha definido como la menor distancia a la pleura entre todos los vóxeles pertenecientes al nódulo:
+
+\[
+p_{\min}
+=
+\min_{\mathbf{x}\in N} D_L(\mathbf{x}),
+\]
+
+donde \(N\) representa la máscara nodular y \(D_L(\mathbf{x})\) es la distancia euclídea desde la posición \(\mathbf{x}\) hasta el exterior de la máscara pulmonar. Esta medida caracteriza el punto del nódulo más próximo a la superficie pleural y permite distinguir, por ejemplo, entre lesiones en contacto o muy próximas a la pleura y lesiones completamente internas.
+
+Por su parte, la variable \texttt{profundidad\_centroidal\_pleura\_mm} se ha calculado evaluando el mismo mapa de distancias en el centro de masas de la máscara nodular, redondeado al vóxel más cercano:
+
+\[
+p_{\mathrm{centroide}}
+=
+D_L\left(\operatorname{round}(\mathbf{c}_N)\right),
+\]
+
+donde \(\mathbf{c}_N\) representa el centro de masas del nódulo. Mientras que la profundidad mínima depende del punto nodular más superficial, la profundidad centroidal describe la localización global de la lesión respecto a la pleura. Ambas medidas se han conservado porque aportan información complementaria: un nódulo puede presentar una pequeña región próxima a la pleura y, al mismo tiempo, mantener la mayor parte de su volumen a una profundidad superior.
+
+
+Cuando no se ha dispuesto de alguna de las máscaras, las dimensiones o el espaciado de las máscaras pulmonar y nodular no han sido compatibles, o el cálculo no ha podido completarse correctamente, las tres variables geométricas se han registrado como ausentes. Se han obtenido medidas geométricas completas para 201 de los 210 pacientes. Por ello, los experimentos que incorporan geometría se han realizado sobre una cohorte emparejada de 201 pacientes con información clínica, etiquetas y medidas geométricas completas.
+
+A partir de estas fuentes se han definido cuatro representaciones. La primera, \texttt{clinical\_full}, contiene las 12 variables clínicas de los 210 pacientes. La segunda, \texttt{clinical\_matched}, contiene las mismas variables clínicas, pero restringidas a los 201 pacientes con geometría completa. La tercera, \texttt{geometry\_only}, contiene únicamente los tres descriptores geométricos de estos 201 pacientes. Finalmente, \texttt{clinical\_geometry} combina las 12 variables clínicas y los tres descriptores geométricos en la misma cohorte emparejada, dando lugar a un conjunto de 15 variables. Esta organización permite aprovechar toda la cohorte en el análisis clínico principal y, simultáneamente, comparar la información clínica, la geometría y su combinación sobre exactamente los mismos pacientes y particiones. De este modo, las diferencias observadas entre estos tres últimos conjuntos no están condicionadas por cambios en la composición de la muestra. El identificador del paciente se ha utilizado exclusivamente para alinear las tablas y nunca ha formado parte del lenguaje de las reglas.
+
+En el análisis de descubrimiento de subgrupos, las etiquetas clínicas se han estudiado como objetivos binarios independientes: \textit{Hemorragia}, \textit{Neumotórax} y \textit{Sin complicación}. Este planteamiento permite identificar patrones asociados a cada complicación sin imponer exclusividad entre hemorragia y neumotórax, y conserva la ausencia de complicación como un objetivo clínico de interés. El derrame pleural no se ha incluido como objetivo independiente debido a que solo estaba presente en un paciente, un soporte insuficiente para obtener patrones reproducibles.
+
+El análisis ha perseguido tres objetivos: identificar reglas interpretables, evaluar su estabilidad y estudiar la aportación de las variables geométricas. Dado el tamaño de la muestra y la ausencia de una cohorte externa, estos objetivos se han considerado exploratorios.
+
+
+\subsection{Diseño experimental}
+
+El análisis se ha organizado en tres experimentos complementarios. En primer lugar, se ha realizado un análisis de robustez para comprobar si las reglas descubiertas se mantienen ante cambios razonables en la cobertura mínima, la longitud máxima del antecedente y el tratamiento de las condiciones binarias de ausencia. Este experimento se ha aplicado a \texttt{clinical\_full}, \texttt{clinical\_matched} y \texttt{clinical\_geometry}. Su finalidad no ha sido seleccionar retrospectivamente la configuración con mayor calidad, sino determinar si las principales estructuras aparecen de forma recurrente bajo diferentes restricciones de búsqueda.
+
+En segundo lugar, las reglas obtenidas en las distintas configuraciones y particiones se han integrado mediante un análisis de consenso y estabilidad. Este análisis ha permitido identificar las estructuras más recurrentes y evaluar por separado la repetición de sus variables y operadores, la variación de sus umbrales y la similitud entre los pacientes cubiertos.
+
+Por último, se ha realizado una ablación emparejada sobre los 201 pacientes con geometría completa. En ella se han comparado \texttt{clinical\_matched}, \texttt{geometry\_only} y \texttt{clinical\_geometry}, utilizando las mismas particiones y condiciones experimentales. Esta comparación se ha planteado para determinar si las variables geométricas aportan información descriptiva por sí solas y si su combinación con las variables clínicas produce reglas más consistentes.
+
+Los tres experimentos se han aplicado de forma independiente a \textit{Hemorragia}, \textit{Neumotórax} y \textit{Sin complicación}.
+
+% Una vez completado el descubrimiento de subgrupos, se ha realizado un análisis exploratorio adicional para comprobar si las reglas representativas permitían definir poblaciones suficientemente homogéneas como para entrenar modelos de imagen específicos.
+
+\section{Metodología}
+
+A continuación se describen los aspectos metodológicos comunes a los tres experimentos. Se detallan el lenguaje de reglas, la estrategia de búsqueda, la validación cruzada, el control de redundancia y los criterios empleados para definir el consenso y evaluar la estabilidad de las reglas.
+
+\subsection{Lenguaje de reglas y estrategia de búsqueda}
+
+Cada subgrupo se ha representado mediante una regla conjuntiva cuyo antecedente contiene entre uno y tres selectores y cuyo consecuente corresponde a la presencia de uno de los tres objetivos analizados. La formulación general de estas reglas y las medidas empleadas para evaluarlas se han presentado en la Sección~\ref{sec:fundamentos_subgroup_discovery}.
+
+Para las variables binarias se han generado selectores de presencia de la forma \(x_j=1\). Como parte del análisis de robustez, también se ha evaluado un lenguaje ampliado que permite condiciones de ausencia de la forma \(x_j=0\). Para las variables numéricas, en nuestro dataset la edad, el tamaño nodular y las dos medidas de profundidad pleural, se han empleado como posibles puntos de corte los percentiles 25, 50 y 75. Cada punto de corte \(t\) ha dado lugar a dos condiciones complementarias, \(x_j \leq t\) y \(x_j > t\). Los percentiles se han calculado de nuevo en el conjunto de entrenamiento de cada partición y se han aplicado sin modificaciones al correspondiente conjunto de prueba, evitando así utilizar información de prueba durante el descubrimiento de las reglas. Cuando el valor de una variable estaba ausente, el paciente no se ha considerado cubierto por ninguna regla que incluyera una condición sobre dicha variable. Por ejemplo, si los percentiles 25, 50 y 75 de la edad calculados en un conjunto de entrenamiento fueran 58, 67 y 74 años, respectivamente, el algoritmo podría generar los siguientes selectores:
+
+\begin{itemize}
+    \item \(\texttt{Edad} \leq 58\) y \(\texttt{Edad} > 58\);
+    \item \(\texttt{Edad} \leq 67\) y \(\texttt{Edad} > 67\);
+    \item \(\texttt{Edad} \leq 74\) y \(\texttt{Edad} > 74\).
+\end{itemize}
+
+
+Las reglas se han construido añadiendo progresivamente selectores sobre variables diferentes, sin permitir que una misma variable aparezca más de una vez en el antecedente. Se han descartado las reglas que no alcanzaban la cobertura mínima exigida, las que cubrían la cohorte completa y aquellas cuyo \textit{WRAcc} de entrenamiento no era positivo. Los candidatos restantes se han ordenado principalmente según su \textit{WRAcc}, utilizando la cobertura y la menor longitud del antecedente como criterios secundarios.
+
+Debido al crecimiento combinatorio del espacio de reglas, se ha utilizado una búsqueda en haz o \textit{beam search}. En cada nivel se han conservado los 100 candidatos mejor valorados para generar el siguiente nivel de refinamiento. El análisis de robustez ha combinado coberturas mínimas de \(0{,}075\), \(0{,}10\), \(0{,}15\) y \(0{,}20\), longitudes máximas de uno, dos y tres selectores, y la activación o desactivación de las condiciones binarias de ausencia. El resto de los parámetros se ha mantenido constante entre las 24 configuraciones.
+
+\subsection{Validación y control de redundancia}
+
+La evaluación se ha realizado mediante validación cruzada estratificada con cinco folds y cinco repeticiones, dando lugar a 25 particiones. La estratificación se ha definido a partir de las combinaciones multietiqueta de hemorragia y neumotórax, agrupando los estratos con un número insuficiente de pacientes. En cada repetición, todos los pacientes han aparecido una vez en el conjunto de prueba y no se ha producido solapamiento entre los conjuntos de entrenamiento y prueba.
+
+En cada partición, los selectores, los umbrales numéricos y las reglas se han obtenido exclusivamente a partir del conjunto de entrenamiento. Posteriormente, las mismas reglas se han aplicado al conjunto de prueba sin modificar sus condiciones ni recalcular sus umbrales. Para cada regla se han registrado por separado las métricas de entrenamiento y prueba, incluyendo los recuentos absolutos, la cobertura, el soporte, la prevalencia global, la prevalencia dentro del subgrupo, la diferencia entre ambas prevalencias, la sensibilidad, el \textit{lift} y el \textit{WRAcc}. La comparación entre los valores de entrenamiento y prueba se ha utilizado para identificar reglas cuya calidad dependía excesivamente de los pacientes empleados durante la búsqueda.
+
+La selección final de cada partición se ha limitado a un máximo de cinco reglas por conjunto de variables y objetivo. Este número constituye un límite superior, ya que el control de redundancia puede producir un número menor de reglas. Para ello, los candidatos se han recorrido en orden decreciente de calidad y se ha calculado el índice de Jaccard entre los conjuntos de pacientes cubiertos. Una regla se ha descartado cuando su solapamiento con alguna regla ya seleccionada era superior a \(0{,}80\). Este procedimiento ha evitado que pequeñas variaciones de una misma descripción dominaran el conjunto de patrones conservados.
+
+La evidencia obtenida mediante validación cruzada se ha complementado con un análisis de permutación. Para cada conjunto de variables, objetivo y configuración se han realizado 1.000 permutaciones de la etiqueta. En cada permutación se ha repetido la búsqueda y se ha conservado el mayor \textit{WRAcc} obtenido bajo la hipótesis nula. El valor de permutación ajustado por la búsqueda se ha calculado comparando el \textit{WRAcc} observado con esta distribución de máximos. De este modo, el contraste ha tenido en cuenta que el algoritmo examina múltiples reglas candidatas, en lugar de evaluar únicamente las reglas seleccionadas como si hubieran sido especificadas de antemano.
+
+La ablación de las variables geométricas se ha realizado sobre los 201 pacientes de la cohorte emparejada. Se han comparado \texttt{clinical\_matched}, \texttt{geometry\_only} y \texttt{clinical\_geometry} utilizando las mismas particiones, objetivos y semilla. En los tres casos se ha fijado una cobertura mínima de \(0{,}10\), una longitud máxima de dos selectores y el lenguaje binario basado en condiciones de presencia. Las comparaciones se han resumido primero por repetición y fold, evitando que las particiones con más reglas tuvieran un peso superior. Para cada par de representaciones se han calculado las diferencias de \textit{WRAcc} de prueba y el número de victorias, empates y derrotas. Estas comparaciones se han considerado descriptivas y no se han interpretado como contrastes estadísticos confirmatorios.
+
+\subsection{Consenso y estabilidad}
+
+Las reglas obtenidas en el análisis de robustez se han agrupado por conjunto de variables, objetivo y estructura. La estructura de una regla ha conservado las variables y los operadores del antecedente. En los selectores binarios también se ha mantenido el valor comparado, de manera que \(x_j=0\) y \(x_j=1\) se han tratado como estructuras diferentes. En cambio, los valores concretos de los umbrales numéricos se han omitido en esta agrupación para permitir que reglas con la misma forma, pero con puntos de corte ligeramente distintos, se analizaran conjuntamente.
+
+La unidad de conteo ha sido cada combinación de configuración, repetición, fold y estructura. Cuando una misma estructura ha aparecido varias veces dentro de una de estas unidades con umbrales diferentes, se ha contabilizado una sola presencia. Para cada estructura se ha calculado la proporción de configuraciones en las que aparece, la proporción de celdas de validación en las que ha sido seleccionada, el \textit{WRAcc} medio de prueba y la fracción de apariciones con \textit{WRAcc} de prueba positivo.
+
+Los criterios de consenso se han definido antes de examinar las reglas agregadas. Una estructura se ha considerado de consenso fuerte cuando ha aparecido en al menos el 75\,\% de las configuraciones y el 50\,\% de las combinaciones de configuración, repetición y fold, ha presentado un \textit{WRAcc} medio de prueba positivo y este valor ha sido positivo en al menos el 60\,\% de sus apariciones. Se ha considerado de consenso moderado cuando ha aparecido en al menos el 50\,\% de las configuraciones y el 25\,\% de las combinaciones, manteniendo los mismos requisitos de calidad fuera de muestra. Las estructuras que no han cumplido estos criterios no se han incorporado al conjunto de consenso.
+
+La estabilidad de las reglas de consenso se ha evaluado en tres dimensiones. La estabilidad sintáctica se ha cuantificado mediante la frecuencia de aparición de cada estructura. Para los selectores numéricos, la variación de los puntos de corte se ha resumido mediante la mediana, el rango intercuartílico y los valores mínimo y máximo. Los umbrales resumidos mediante estas estadísticas se han interpretado como descripciones de su variabilidad y no como nuevos puntos de corte reentrenados.
+
+Finalmente, la estabilidad extensional se ha evaluado comparando los pacientes cubiertos por reglas con la misma estructura. En cada combinación de configuración, repetición y fold se ha conservado como máximo una regla por estructura y se ha aplicado sobre una cohorte común. A continuación, se ha calculado el índice de Jaccard entre todos los pares de coberturas disponibles y se ha resumido su distribución mediante la media, la mediana, el rango intercuartílico y el rango total. Los identificadores y las máscaras individuales de cobertura se han mantenido únicamente durante el cálculo local, mientras que los resultados exportados han contenido exclusivamente medidas agregadas.
+
+La estabilidad estructural, la estabilidad de los umbrales, el solapamiento de las coberturas y la evidencia por permutación se han mantenido como criterios independientes. Por tanto, la repetición frecuente de una estructura no se ha considerado por sí sola evidencia suficiente si no estaba acompañada de una calidad positiva fuera de muestra y de un soporte adecuado.
+
+
+\section{Resultados}
+En esta sección se resumen las estructuras más relevantes del análisis de descubrimiento de subgrupos. La tabla principal del capítulo recoge una selección reducida de reglas representativas para facilitar la interpretación clínica, mientras que el conjunto completo de reglas de consenso obtenidas en los experimentos válidos, en los que se excluyó la variable \texttt{Sexo\_binaria}, se presenta en el Anexo~\ref{anexo:sd-reglas-consenso}.
+
+\subsection{Robustez frente a la configuración}
+
+El análisis ha producido inicialmente 658 estructuras diferentes. Tras aplicar los criterios de recurrencia y calidad fuera de muestra definidos para el consenso, se han conservado 31 estructuras: 4 de consenso fuerte y 27 de consenso moderado. Las cuatro estructuras fuertes corresponden a \textit{Sin complicación}, mientras que para hemorragia y neumotórax únicamente se han obtenido estructuras de consenso moderado.
+
+La Tabla~\ref{tab:sd_numero_consensos} muestra la distribución de las estructuras conservadas por conjunto de variables y objetivo. \textit{Sin complicación} ha concentrado el mayor número de resultados recurrentes. Aunque la incorporación de variables geométricas no ha aumentado el número total de consensos para hemorragia o neumotórax, ha permitido identificar estructuras diferentes basadas en el tamaño y la profundidad pleural del nódulo.
+
+\begin{table}[!htbp]
+\centering
+\caption{Número de estructuras de consenso obtenidas para cada conjunto de variables y objetivo.}
+\label{tab:sd_numero_consensos}
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{3.0cm}ccc}
+\hline
+\textbf{Conjunto} &
+\textbf{Hemorragia} &
+\textbf{Neumotórax} &
+\textbf{Sin complicación} \\
+\hline
+\texttt{clinical\_full} &
+3 moderadas &
+4 moderadas &
+1 fuerte + 3 moderadas \\
+\texttt{clinical\_matched} &
+4 moderadas &
+4 moderadas &
+2 fuertes + 2 moderadas \\
+\texttt{clinical\_geometry} &
+2 moderadas &
+1 moderada &
+1 fuerte + 4 moderadas \\
+\hline
+\textbf{Total} &
+\textbf{9} &
+\textbf{9} &
+\textbf{13} \\
+\hline
+\end{tabular}
+\end{table}
+
+La presencia de estructuras recurrentes no ha implicado necesariamente una magnitud elevada del efecto. En particular, algunas reglas clínicas simples han aparecido en numerosas particiones, pero han presentado valores de \textit{WRAcc} de prueba próximos a cero. Por tanto, la robustez frente a la configuración se ha utilizado como criterio de reproducibilidad estructural y no como sustituto de la calidad fuera de muestra o de la evidencia por permutación.
+
+\subsection{Reglas de consenso}
+
+Para resumir los patrones principales se ha seleccionado una regla representativa por objetivo en \texttt{clinical\_matched} y \texttt{clinical\_geometry}. Esta selección ha priorizado el nivel de consenso, la frecuencia de aparición entre configuraciones y folds, y el \textit{WRAcc} medio de prueba. Las seis reglas resultantes se presentan en la Tabla~\ref{tab:sd_reglas_principales}. Los umbrales numéricos corresponden a la mediana de los puntos de corte observados para cada estructura y no deben interpretarse como límites clínicos definitivos.
+
+\begin{table}[!htbp]
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \caption{Principales reglas de consenso obtenidas en la cohorte emparejada. \(\Delta p\) representa la diferencia media entre la prevalencia del objetivo dentro del subgrupo y su prevalencia global.}
+    \label{tab:sd_reglas_principales}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{p{2.0cm}p{1.8cm}p{5.0cm}p{1.5cm}p{1.0cm}p{1.0cm}p{1.0cm}}
+        \hline
+        \textbf{Conjunto} &
+        \textbf{Objetivo} &
+        \textbf{Antecedente} &
+        \textbf{Consenso} &
+        \textbf{Config.} &
+        \textbf{WRAcc} &
+        \(\boldsymbol{\Delta p}\) \\
+        \hline
+
+        Clínica &
+        Hemorragia &
+        \(\texttt{Edad}>60{,}0\) &
+        Moderado &
+        16/24 &
+        0,0086 &
+        0,0085 \\
+
+        Clínica + geometría &
+        Hemorragia &
+        \(\texttt{tamano\_nodulo\_mm}\leq31{,}05\) &
+        Moderado &
+        16/24 &
+        0,0257 &
+        0,0638 \\
+
+        Clínica &
+        Neumotórax &
+        \(\texttt{Tabac\_any}=1\) &
+        Moderado &
+        16/24 &
+        0,0084 &
+        0,0111 \\
+
+        Clínica + geometría &
+        Neumotórax &
+        \(\texttt{profundidad\_centroidal\_pleura\_mm}\leq10{,}21\)
+        y \(\texttt{tamano\_nodulo\_mm}\leq42{,}80\) &
+        Moderado &
+        12/24 &
+        0,0435 &
+        0,0690 \\
+
+        Clínica &
+        Sin complicación &
+        \(\texttt{Sin\_patología\_pulmonar}=1\) &
+        Fuerte &
+        24/24 &
+        0,0511 &
+        0,0816 \\
+
+        Clínica + geometría &
+        Sin complicación &
+        \(\texttt{tamano\_nodulo\_mm}>42{,}50\) &
+        Fuerte &
+        24/24 &
+        0,0545 &
+        0,1671 \\
+        \hline
+    \end{tabular}%
+    }
+\end{table}
+
+En colaboración con el equipo médico, se han analizado las reglas obtenidas con el objetivo de proponer posibles explicaciones clínicas para las asociaciones observadas. Estas interpretaciones han tratado de relacionar las características de cada subgrupo con la dificultad técnica de la biopsia y con los mecanismos que podrían favorecer la aparición de hemorragia o neumotórax. No obstante, se han planteado únicamente como hipótesis médicas plausibles, ya que las reglas describen asociaciones exploratorias y no permiten establecer relaciones causales.
+
+Para hemorragia, la principal estructura clínica ha descrito a pacientes mayores de aproximadamente 60 años. Aunque ha aparecido en 16 de las 24 configuraciones y en 338 de las 600 combinaciones de configuración y fold, su \textit{WRAcc} medio de prueba ha sido reducido, con una diferencia de prevalencias de 0,0085. La regla basada en un tamaño nodular menor o igual a 31,05 mm ha presentado una asociación descriptiva mayor, con un \textit{WRAcc} de 0,0257 y una diferencia de prevalencias de 0,0638. No obstante, ninguna de las dos reglas ha presentado evidencia ajustada favorable en las permutaciones realizadas, por lo que los resultados de hemorragia se han considerado exploratorios.
+
+Para neumotórax, la principal regla clínica ha correspondido a la presencia de antecedentes de tabaquismo. Esta estructura ha aparecido en 16 configuraciones, pero ha mostrado un \textit{WRAcc} de prueba de 0,0084 y una diferencia de prevalencias de 0,0111. La principal regla que incorpora geometría ha combinado una profundidad centroidal respecto a la pleura menor o igual a 10,21 mm con un tamaño nodular menor o igual a 42,80 mm. Esta regla ha alcanzado un \textit{WRAcc} medio de 0,0435 y una diferencia de prevalencias de 0,0690. Además, ha presentado evidencia ajustada favorable en 8 de las 12 configuraciones en las que se ha evaluado mediante permutación. Por tanto, la estructura geométrica ha mostrado una señal más consistente que la regla basada únicamente en tabaquismo.
+
+Las reglas más robustas se han obtenido para \textit{Sin complicación}. La ausencia registrada de patología pulmonar ha aparecido en las 24 configuraciones y en 496 de las 600 combinaciones de configuración y fold. Esta regla ha presentado un \textit{WRAcc} medio de prueba de 0,0511 y una prevalencia del objetivo 0,0816 superior a la prevalencia global. La estructura ha mostrado evidencia ajustada favorable en las 20 configuraciones en las que ha sido evaluada mediante permutación.
+
+En el conjunto clínico y geométrico, un tamaño nodular superior a 42,50 mm también ha alcanzado consenso fuerte, al aparecer en las 24 configuraciones y en 402 de las 600 combinaciones. Su \textit{WRAcc} medio de prueba ha sido 0,0545 y la diferencia de prevalencias ha alcanzado 0,1671. La evidencia ajustada por permutación ha sido favorable en las 16 configuraciones en las que se ha evaluado. Este resultado describe una asociación observada en la cohorte, pero no permite interpretar el tamaño nodular como una causa de la ausencia de complicaciones.
+
+En colaboración con el equipo médico, se han propuesto posibles explicaciones para las reglas con una interpretación clínica más directa. La asociación entre los nódulos pequeños y la hemorragia podría deberse a que un objetivo de menor tamaño exige mayor precisión y ofrece menos margen para posicionar la aguja, aumentando potencialmente la posibilidad de lesionar vasos próximos. Esta hipótesis es compatible con estudios previos que han identificado el menor tamaño de la lesión como un factor de riesgo independiente de hemorragia pulmonar \cite{Zhu2020}. En sentido contrario, los nódulos grandes podrían facilitar el acceso y reducir las correcciones de la trayectoria, contribuyendo a explicar su asociación con la ausencia de complicaciones. Asimismo, la ausencia de patología pulmonar podría reflejar un parénquima más conservado y menos susceptible a complicaciones. Como apoyo indirecto, el enfisema se ha asociado previamente con un mayor riesgo de neumotórax y de hemorragia de mayor grado \cite{Zhao2017}.
+
+\subsection{Estabilidad de las reglas}
+
+La estabilidad se ha analizado sobre las 31 estructuras de consenso y las 7.976 apariciones registradas en las diferentes configuraciones y folds. En 19 de estas estructuras se han identificado selectores numéricos cuyos umbrales podían variar entre particiones.
+
+Las reglas formadas únicamente por condiciones binarias han presentado, en general, una estabilidad extensional elevada. Las estructuras como \(\texttt{Sin\_patología\_pulmonar}=1\), \(\texttt{Tabac\_any}=1\) y \(\texttt{Enfisema\_any}=1\) han alcanzado un índice de Jaccard mediano igual a 1. Este resultado se debe a que las condiciones binarias se han aplicado sobre una cohorte común y no dependen de umbrales recalculados en cada fold. No obstante, la cobertura estable de una regla no implica necesariamente una asociación intensa con el objetivo, como ha mostrado el reducido \textit{WRAcc} de la regla basada en tabaquismo para neumotórax.
+
+Entre las estructuras numéricas, la regla geométrica de neumotórax ha presentado la mayor estabilidad extensional. La combinación de profundidad centroidal y tamaño nodular ha obtenido un Jaccard mediano de 0,985, con un rango intercuartílico entre 0,977 y 0,993. Por tanto, aunque los umbrales se han recalculado en cada conjunto de entrenamiento, las distintas versiones de esta estructura han identificado grupos de pacientes muy similares.
+
+La estabilidad ha sido menor para la principal regla geométrica de hemorragia. La condición basada en un tamaño nodular inferior ha obtenido un Jaccard mediano de 0,645 y un rango intercuartílico entre 0,372 y 0,961. Esta dispersión indica que las variaciones del umbral han producido cambios relevantes en los pacientes cubiertos, por lo que el punto de corte de 31,05 mm debe interpretarse únicamente como un resumen de los umbrales observados.
+
+La regla geométrica de \textit{Sin complicación}, basada en un tamaño nodular superior a 42,50 mm, ha presentado una estabilidad intermedia, con un Jaccard mediano de 0,833 y un rango intercuartílico entre 0,510 y 0,959. Aunque la estructura ha aparecido en todas las configuraciones, la amplitud del intervalo muestra que su cobertura ha variado entre particiones. Por ello, la recurrencia de la variable y del sentido de la desigualdad ha sido más clara que la existencia de un punto de corte único.
+
+La estructura clínica de hemorragia basada en una edad superior a aproximadamente 60 años ha obtenido un Jaccard mediano de 0,960, con un rango intercuartílico entre 0,924 y 1,000. En este caso, las variaciones del umbral han modificado poco la composición del subgrupo. En conjunto, estos resultados muestran que la estabilidad estructural y la estabilidad extensional proporcionan información diferente: una estructura puede aparecer con frecuencia, pero identificar grupos variables cuando sus umbrales cambian entre particiones.
+
+\subsection{Ablación de las variables geométricas}
+La ablación se ha realizado sobre los 201 pacientes con información completa. Se ha comprobado la presencia de los 25 folds para cada combinación de representación y objetivo, obteniéndose los 225 resúmenes esperados.
+
+
+La Tabla~\ref{tab:sd_ablacion_wracc} recoge el \textit{WRAcc} medio de prueba de cada representación. La geometría ha superado descriptivamente al bloque clínico en los tres objetivos. La combinación de clínica y geometría también ha mejorado respecto a la clínica aislada, aunque no ha superado de manera consistente al bloque geométrico.
+
+\begin{table}[!htbp]
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \caption{\textit{WRAcc} medio de prueba en la ablación emparejada de variables clínicas y geométricas.}
+    \label{tab:sd_ablacion_wracc}
+    \begin{tabular}{lccc}
+        \hline
+        \textbf{Conjunto} &
+        \textbf{Hemorragia} &
+        \textbf{Neumotórax} &
+        \textbf{Sin complicación} \\
+        \hline
+        \texttt{clinical\_matched}
+        & 0,0090 & -0,0002 & 0,0236 \\
+
+        \texttt{geometry\_only}
+        & 0,0198 & 0,0308 & 0,0401 \\
+
+        \texttt{clinical\_geometry}
+        & 0,0137 & 0,0210 & 0,0428 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+Para hemorragia, la geometría ha incrementado el \textit{WRAcc} medio en 0,0108 respecto al bloque clínico y ha obtenido un valor superior en 17 de los 25 folds. La combinación de clínica y geometría también ha mejorado respecto a la clínica, aunque con una diferencia menor, de 0,0047, y 15 folds favorables. En la comparación directa, la geometría aislada ha superado a la combinación en 15 folds, frente a 10 favorables a la representación combinada.
+
+En neumotórax se ha observado la diferencia más clara. La geometría ha superado a la clínica en 21 de los 25 folds, con un incremento medio de \textit{WRAcc} de 0,0310. La representación combinada ha mejorado respecto a la clínica en 18 folds, con una diferencia media de 0,0212. Sin embargo, la geometría aislada ha superado a la combinación en 17 folds, mientras que la combinación solo ha sido mejor en 5 y se han producido 3 empates.
+
+Para \textit{Sin complicación}, la geometría ha mejorado el \textit{WRAcc} respecto a la clínica en 19 folds, con una diferencia media de 0,0165. La combinación ha presentado la mayor media global y ha superado a la clínica en 21 folds, con una diferencia de 0,0193. Frente a la geometría aislada, la mejora de la combinación ha sido reducida, con una diferencia media de 0,0027 y 14 folds favorables frente a 11.
+
+\begin{table}[!htbp]
+    \centering
+    \small
+    \caption{Comparaciones pareadas de \textit{WRAcc} entre representaciones. Los resultados indican la diferencia media y el número de victorias, empates y derrotas en los 25 folds.}
+    \label{tab:sd_ablacion_pareada}
+    \begin{tabular}{llcc}
+        \hline
+        \textbf{Objetivo} &
+        \textbf{Comparación} &
+        \(\boldsymbol{\Delta}\)\textbf{WRAcc} &
+        \textbf{V/E/D} \\
+        \hline
+
+        Hemorragia &
+        Geometría -- clínica &
+        0,0108 &
+        17/0/8 \\
+
+        Hemorragia &
+        Combinación -- clínica &
+        0,0047 &
+        15/0/10 \\
+
+        Hemorragia &
+        Combinación -- geometría &
+        -0,0061 &
+        10/0/15 \\
+        \hline
+
+        Neumotórax &
+        Geometría -- clínica &
+        0,0310 &
+        21/0/4 \\
+
+        Neumotórax &
+        Combinación -- clínica &
+        0,0212 &
+        18/0/7 \\
+
+        Neumotórax &
+        Combinación -- geometría &
+        -0,0098 &
+        5/3/17 \\
+        \hline
+
+        Sin complicación &
+        Geometría -- clínica &
+        0,0165 &
+        19/0/6 \\
+
+        Sin complicación &
+        Combinación -- clínica &
+        0,0193 &
+        21/0/4 \\
+
+        Sin complicación &
+        Combinación -- geometría &
+        0,0027 &
+        14/0/11 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+El análisis por permutación ha sido coherente con estas diferencias descriptivas. Para hemorragia, ninguna de las cinco reglas principales de las tres representaciones ha alcanzado un valor ajustado inferior o igual a 0,05. Para neumotórax, este criterio se ha cumplido en dos de las cinco reglas geométricas y en una de las cinco reglas que combinan clínica y geometría, pero en ninguna de las reglas clínicas. Para \textit{Sin complicación}, se ha cumplido en una de las cinco reglas clínicas, tres de las cinco reglas geométricas y las cinco reglas de la representación combinada.
+
+En conjunto, la ablación indica que las variables geométricas contienen información descriptiva relevante, especialmente para neumotórax y \textit{Sin complicación}. Sin embargo, la combinación de la información clínica y geométrica no ha producido una mejora uniforme respecto a la geometría aislada. Estas diferencias se han interpretado de forma descriptiva, ya que los folds de una validación cruzada repetida no constituyen observaciones independientes y no se dispone de una cohorte externa para confirmar los patrones.
+
+\subsection{Modelos específicos basados en las reglas descubiertas}
+Una vez identificadas las reglas representativas, se ha evaluado si los subgrupos definidos por ellas podían utilizarse como cohortes de entrenamiento para modelos predictivos especializados. La hipótesis planteada ha sido que la menor heterogeneidad interna de estos subgrupos podría facilitar el aprendizaje de patrones específicos, aunque a costa de reducir el número de pacientes disponibles. Para comprobarlo, se han entrenado primero modelos 3D basados en imagen y, posteriormente, modelos clásicos con características radiómicas. En ambos casos, cada modelo especializado se ha comparado con su correspondiente modelo general sobre los mismos pacientes del subgrupo.
+
+Los modelos 3D entrenados específicamente en cada subgrupo no han mejorado el rendimiento del modelo general. Este resultado puede deberse a la reducción adicional del número de pacientes disponibles para el entrenamiento, especialmente en una cohorte ya limitada.
+
+Ante este resultado, se ha repetido la comparación utilizando características radiómicas y modelos clásicos. El análisis se ha centrado en las reglas de consenso moderado asociadas directamente con hemorragia y neumotórax. En la comparación emparejada, algunos modelos especializados han obtenido mejoras leves respecto al mismo algoritmo entrenado con la cohorte completa y evaluado sobre los mismos pacientes del subgrupo.
+
+\begin{table}[!htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+
+\caption{Resultados de los modelos radiómicos especializados en los subgrupos de consenso moderado. El modelo general corresponde al mismo algoritmo entrenado con la cohorte completa.}
+\label{tab:resultados_modelos_subgrupos}
+
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Subgrupo} &
+\textbf{Modelo} &
+\textbf{General} &
+\textbf{Especializado} &
+\shortstack{\(\boldsymbol{\Delta}\)\\\textbf{F1 micro}} \\
+\midrule
+
+Edad \(>60\) &
+Regresión logística &
+0,420 &
+0,471 &
++0,051 \\
+
+Tamaño \(\leq 31{,}05\) mm &
+Regresión logística &
+0,491 &
+0,549 &
++0,057 \\
+
+\texttt{Tabac\_any} \(=1\) &
+Random Forest &
+0,448 &
+0,480 &
++0,032 \\
+
+Profundidad \(\leq 10{,}21\) mm y tamaño \(\leq 42{,}80\) mm &
+Extra Trees &
+0,509 &
+0,549 &
++0,040 \\
+
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+
+Aunque las diferencias han sido reducidas, los resultados sugieren que la especialización mediante características radiómicas puede aportar una mejora local en algunos subgrupos. Sin embargo, el análisis no ha demostrado una ventaja general de los modelos especializados.
+
+% Una vez identificadas las reglas principales, se ha evaluado si los subgrupos definidos por ellas podían utilizarse para entrenar modelos de imagen especializados. La hipótesis ha sido que la reducción de la heterogeneidad dentro de cada subgrupo podría facilitar el aprendizaje de patrones específicos, aunque a costa de disminuir el número de pacientes disponibles. Se han considerado las seis reglas representativas de la Tabla~\ref{tab:sd_reglas_principales}, una clínica y otra clínica y geométrica por cada objetivo.
+
+% Para cada regla se ha entrenado un nuevo modelo ResNet-10 3D utilizando únicamente los pacientes del subgrupo. Su rendimiento se ha comparado con el del modelo general, entrenado sobre la cohorte completa y evaluado exactamente sobre los mismos pacientes. Se han mantenido los cinco folds externos, mientras que la partición de validación interna se ha recalculado dentro de cada subgrupo. El \textit{early stopping} y la selección de umbrales se han realizado exclusivamente con esta validación interna. La métrica principal ha sido el F1 micro OOF de las dos complicaciones con umbrales ajustados.
+
+% \begin{table}[!htbp]
+%     \centering
+%     \small
+%     \caption{Comparación entre el modelo general y el modelo especializado en cada subgrupo. \(\Delta\) se ha calculado como modelo especializado menos modelo general.}
+%     \label{tab:sd_modelos_especializados}
+%     \begin{tabular}{p{6.2cm}rrrr}
+%         \hline
+%         \textbf{Regla} & \textbf{\(n\)} & \textbf{General} & \textbf{Especializado} & \textbf{\(\Delta\)} \\
+%         \hline
+%         Edad \(>60\) años
+%         & 146 & 0,500 & 0,451 & -0,049 \\
+
+%         Tamaño nodular \(\leq31,05\) mm
+%         & 106 & 0,529 & 0,512 & -0,016 \\
+
+%         \texttt{Tabac\_any}\(=1\)
+%         & 149 & 0,493 & 0,429 & -0,064 \\
+
+%         Profundidad centroidal \(\leq10,21\) mm y tamaño \(\leq42,80\) mm
+%         & 132 & 0,531 & 0,521 & -0,011 \\
+
+%         \texttt{Sin\_patología\_pulmonar}\(=1\)
+%         & 130 & 0,427 & 0,333 & -0,094 \\
+
+%         Tamaño nodular \(>42,50\) mm
+%         & 54 & 0,308 & 0,244 & -0,064 \\
+%         \hline
+%     \end{tabular}
+% \end{table}
+
+% Ninguno de los modelos especializados ha mejorado el F1 micro respecto al modelo general. Las diferencias más pequeñas se han observado en el subgrupo geométrico de neumotórax, con \(\Delta=-0,011\), y en el subgrupo de nódulos pequeños asociado con hemorragia, con \(\Delta=-0,016\). Las mayores pérdidas se han producido en los subgrupos definidos por ausencia de patología pulmonar y por tabaquismo. Además, el \textit{Hamming loss} ha aumentado en los seis modelos especializados.
+
+% Estos resultados indican que la posible reducción de la heterogeneidad no ha compensado la pérdida de pacientes disponibles para el entrenamiento. Por tanto, las reglas han resultado útiles para describir perfiles clínicos y geométricos, pero no han proporcionado una ventaja para entrenar modelos 3D independientes. Este análisis se ha considerado exploratorio, ya que las reglas y la configuración del modelo se han seleccionado retrospectivamente sobre la misma cohorte.
+
+
+% \section{Discusión}
+
+% \section{Limitaciones}

@@ -1,0 +1,873 @@
+\chapter{Radiómica}\label{chap:radiomica}
+
+% En este capítulo se presenta el bloque de trabajo basado en radiómica, orientado a transformar las imágenes médicas y sus segmentaciones en un conjunto de características cuantitativas útiles para el análisis y la predicción de complicaciones. Para ello, se describe primero el proceso de extracción de características sobre imágenes originales y preprocesadas, después el análisis exploratorio y la reducción de dimensionalidad aplicada, y finalmente los experimentos de modelado multietiqueta realizados con variables radiómicas y clínicas.
+Este capítulo presenta la extracción y el análisis de características radiómicas, así como su utilización junto con variables clínicas en modelos multietiqueta.
+
+\section{Extracción de características radiómicas}
+
+En esta sección se describe la extracción de características radiómicas a partir de las imágenes médicas y sus segmentaciones. El objetivo de esta fase ha sido transformar la información volumétrica en una representación cuantitativa estructurada que pueda analizarse, preprocesarse y utilizarse posteriormente en el modelado predictivo.
+
+La extracción se ha implementado mediante la biblioteca de Python \texttt{PyRadiomics} \cite{VanGriethuysen2017}, ampliamente utilizada en el análisis de imagen médica para la obtención de descriptores de intensidad, forma y textura, y apoyada en \texttt{SimpleITK} \cite{yaniv2018simpleitk} para el manejo de imágenes médicas y operaciones de remuestreo. La extracción se ha mantenido separada de la clasificación para facilitar la inspección y reutilización de los conjuntos generados.
+
+Para todas las variantes evaluadas, el proceso de extracción se ha mantenido bajo una misma configuración de parámetros. En concreto, se han fijado los siguientes ajustes:
+
+\begin{itemize}
+    \item \texttt{binWidth = 25}: establece la anchura de los intervalos empleados para discretizar las intensidades antes del cálculo de múltiples características de textura. Este paso resulta relevante porque dichas características no se obtienen directamente a partir de intensidades continuas, sino sobre una versión discretizada de la imagen, por lo que este parámetro influye en el nivel de detalle con el que se representa la heterogeneidad interna de la región analizada.
+
+    \item \texttt{resampledPixelSpacing = [1,1,1]}: permite remuestrear todas las imágenes a un mismo tamaño de vóxel, en este caso isotrópico de 1 mm. De este modo, se reduce la variabilidad asociada a diferencias en la resolución espacial de adquisición y se consigue que las características radiómicas se extraigan sobre imágenes espacialmente comparables.
+
+    \item \texttt{sitkBSpline}: corresponde al interpolador utilizado durante el remuestreo. Este método permite estimar los nuevos valores de intensidad de forma suave y continua a partir de la información original de la imagen, proporcionando una representación más estable de la estructura radiológica durante el cambio de resolución.
+
+    \item \texttt{normalize}: activa la normalización de intensidades, con el objetivo de homogeneizar la escala global de valores dentro de la región analizada y reducir el efecto de variaciones técnicas entre estudios. De este modo, se favorece que las características extraídas reflejen en mayor medida propiedades del tejido y no únicamente diferencias asociadas a las condiciones de adquisición.
+
+    \item \texttt{removeOutliers = 3}: permite eliminar valores extremos en la distribución de intensidades antes de la normalización. En concreto, se atenúa la influencia de aquellos valores que se desvían más de $\pm 3$ veces la desviación estándar con respecto a la media, evitando que intensidades atípicas afecten de forma desproporcionada al proceso de extracción.
+\end{itemize}
+
+Esta configuración común se ha utilizado en todos los experimentos para que las diferencias observadas pudieran atribuirse principalmente a la región anatómica analizada o al tipo de imagen de entrada, y no a variaciones en el procedimiento de extracción.
+
+Además, conviene distinguir entre los tipos de características que puede generar \texttt{PyRadiomics} y los modos de extracción definidos. De forma general, la biblioteca permite obtener descriptores calculados tanto sobre la imagen original como sobre distintas transformaciones derivadas de ella. Esta posibilidad se ha concretado en dos modos principales. El primero, denominado \textit{basic}, se ha restringido a las características calculadas sobre la imagen original, constituyendo la variante más simple y directamente interpretable. El segundo, denominado \textit{extended}, ha ampliado esta representación incorporando también descriptores obtenidos a partir de imágenes transformadas, con el fin de capturar patrones más complejos de heterogeneidad espacial. En este modo extendido se han incluido, además de la imagen original, transformaciones \textit{Wavelet}, \textit{Laplacian of Gaussian} (LoG) con distintos valores de sigma, así como transformaciones \textit{Square}, \textit{SquareRoot}, \textit{Exponential}, \textit{Logarithm}, \textit{Gradient} y descriptores \textit{LBP}. En ambos modos, las características extraídas se han correspondido con los grupos clásicos de \texttt{PyRadiomics}, incluyendo descriptores de primer orden, forma y textura.
+
+Sobre esta configuración común se han definido dos ramas de extracción: una basada en imágenes originales, como escenario próximo al planteamiento clásico de la radiómica, y otra basada en imágenes preprocesadas, destinada a evaluar el efecto de las transformaciones previas sobre las características obtenidas.
+
+\subsection{Extracción sobre imágenes originales}
+
+Una de las estrategias consideradas dentro del bloque radiómico ha sido la extracción de características a partir de las imágenes originales anonimizadas. Esta opción ha permitido trabajar directamente con los estudios de partida, sin introducir transformaciones que pudieran modificar la distribución de intensidades o la estructura espacial de la imagen, y obtener una representación de referencia para compararla posteriormente con la extraída de las imágenes preprocesadas.
+
+La extracción se ha realizado sobre los volúmenes en formato NIfTI y sus segmentaciones asociadas. En la configuración inicial, la máscara del nódulo se ha considerado la región anatómica principal de interés, al tratarse de la estructura más directamente relacionada con el procedimiento de biopsia. No obstante, el \textit{pipeline} se ha diseñado para incorporar otras máscaras anatómicas y distintas combinaciones entre ellas, de modo que la extracción no quedara restringida a una única región de análisis.
+
+\subsection{Extracción sobre imágenes preprocesadas}
+
+De forma complementaria, se ha desarrollado una segunda estrategia basada en imágenes preprocesadas para estudiar si determinadas transformaciones previas permiten obtener descriptores radiómicos más informativos. En concreto, se ha analizado cómo estas transformaciones afectan a la información de intensidad, forma y textura capturada durante la extracción.
+
+Para ello, se han considerado distintas familias de volúmenes preprocesados, incluyendo variantes con redimensionado espacial y transformaciones de intensidad basadas en ventanas de unidades Hounsfield. Esta rama ha trabajado con múltiples representaciones generadas a partir de los mismos casos clínicos, lo que ha requerido gestionar de forma sistemática las distintas entradas y mantener la correspondencia entre imagen, paciente y máscara anatómica.
+
+% La organización de los datos preprocesados también ha diferido del esquema empleado en la extracción sobre imágenes originales, por lo que ha sido necesario desarrollar un extractor específico para este nuevo \textit{layout}. Esta adaptación ha permitido recorrer automáticamente las carpetas de imágenes y máscaras, identificar correctamente las distintas variantes disponibles y generar salidas consistentes y comparables entre preprocesamientos.
+
+Dentro de esta línea, también se han extraído características de distintas máscaras anatómicas, incluyendo pulmón, nódulo, vasos y árbol traqueobronquial. Esta estrategia ha presentado dificultades relacionadas con la cobertura desigual de algunas máscaras y con la existencia de segmentaciones vacías o no informativas. Por ello, durante el control de calidad se ha distinguido entre la ausencia de una máscara, la presencia de una máscara sin contenido útil y un fallo del proceso de extracción.
+
+Las variantes \texttt{multiwindowing} han requerido un tratamiento específico porque incorporan varias ventanas como canales diferenciados, dando lugar a una estructura efectiva en cuatro dimensiones. Los canales se han separado y tratado como imágenes tridimensionales independientes, conservando su geometría espacial. Finalmente, los descriptores extraídos de cada canal se han concatenado para formar un único vector de características radiómicas por paciente.
+
+En conjunto, esta rama ha permitido comparar distintas representaciones de la imagen y evaluar el efecto de los preprocesamientos sobre las características obtenidas y su utilidad posterior en la clasificación.
+
+
+
+
+\section{Análisis exploratorio y preprocesamiento de las características radiómicas}
+
+Tras la extracción de características radiómicas, se realizó un análisis exploratorio para estudiar la estructura del conjunto de datos, detectar redundancias entre variables y evaluar de forma preliminar su relación con las etiquetas clínicas de complicación.
+
+Como limpieza inicial, se eliminaron metadatos, identificadores, columnas diagnósticas y variables no radiómicas, conservando únicamente las características numéricas válidas para el análisis. Tras este proceso, se obtuvo una matriz de alta dimensionalidad. En el conjunto \textit{basic} se conservaron 214 características, distribuidas de forma equilibrada entre las máscaras de pulmón y nódulo, como se resume en la Tabla~\ref{tab:familias_radiomicas_basic}. La mayor parte de las variables pertenecían a familias de textura y primer orden, como GLCM, GLRLM, GLSZM, GLDM y características estadísticas de intensidad. Por su parte, el conjunto \textit{extended}, al incorporar transformaciones adicionales de la imagen, alcanzó 2961 características, evidenciando un incremento considerable de la dimensionalidad y la necesidad de aplicar técnicas de reducción y selección de variables antes del modelado.
+
+\begin{table}[!htbp]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.15}
+    \begin{tabular}{lrrr}
+        \hline
+        \textbf{Familia} & \textbf{Pulmón} & \textbf{Nódulo} & \textbf{Total} \\
+        \hline
+        First order & 18 & 18 & 36 \\
+        GLCM & 24 & 24 & 48 \\
+        GLDM & 14 & 14 & 28 \\
+        GLRLM & 16 & 16 & 32 \\
+        GLSZM & 16 & 16 & 32 \\
+        NGTDM & 5 & 5 & 10 \\
+        Shape & 14 & 14 & 28 \\
+        \hline
+        \textbf{Total} & \textbf{107} & \textbf{107} & \textbf{214} \\
+        \hline
+    \end{tabular}
+    \caption{Distribución de características radiómicas \textit{basic} por familia y máscara anatómica.}
+    \label{tab:familias_radiomicas_basic}
+\end{table}
+
+Desde el punto de vista de la calidad del dato, la presencia de valores ausentes ha sido limitada y se ha debido a máscaras vacías, demasiado pequeñas o con geometría inadecuada, así como a desajustes espaciales puntuales entre la máscara y el volumen. Estas incidencias han afectado a regiones concretas, por lo que los pacientes se han mantenido cuando las demás máscaras contenían información válida. En las características \textit{basic}, la ausencia completa de características ha afectado al 0,49\% de los pacientes para \texttt{lung}, al 1,94\% para \texttt{nodule}, al 0,97\% para \texttt{vessels} y al 1,46\% para \texttt{trachea\_bronchia}. En las características \textit{extended}, los porcentajes han sido del 0,97\%, 2,43\%, 1,46\% y 1,94\%, respectivamente. Tras la limpieza, se han eliminado las características completamente vacías o constantes y los valores ausentes restantes se han imputado mediante la mediana.
+
+La Figura~\ref{fig:eda_radiomics_distribuciones} muestra la distribución de algunas características representativas. Se observa que muchas variables presentan distribuciones asimétricas y con colas largas, especialmente en características de primer orden y textura. Este comportamiento es más acusado en las características asociadas al nódulo, donde algunos descriptores concentran gran parte de los valores cerca de cero y presentan pocos pacientes con valores extremos. Este resultado es relevante porque sugiere la necesidad de aplicar escalado, imputación y selección de variables antes de entrenar modelos predictivos.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/radiomica/eda_radiomics_distribuciones_basic.png}
+    \caption{Distribución de características radiómicas originales seleccionadas, separadas por máscara y familia de características.}
+    \label{fig:eda_radiomics_distribuciones}
+\end{figure}
+
+
+% Uno de los resultados más relevantes del análisis exploratorio fue la elevada dimensionalidad y redundancia de las características radiómicas. Por este motivo, se evaluaron distintas estrategias de reducción no supervisada antes del modelado. En primer lugar, se aplicó \textit{Variance Threshold} con umbral 0,01, con el objetivo de eliminar variables con varianza muy baja. En segundo lugar, se eliminó redundancia lineal descartando características con correlación absoluta superior o igual a 0,95. Finalmente, se estimó el número de componentes principales necesarios para preservar el 90\%, 95\% y 99\% de la varianza mediante PCA. Como se resume en la Tabla~\ref{tab:reduccion_dimensionalidad_radiomics}, el conjunto \textit{basic} se redujo de 214 a 115 características tras eliminar variables redundantes, mientras que el conjunto \textit{extended} pasó de 2961 a 1325. Además, PCA permitió representar el 95\% de la varianza con 26 componentes en el conjunto \textit{basic} y 57 en el conjunto \textit{extended}, lo que indica que gran parte de la información radiómica puede concentrarse en un subespacio de menor dimensión. En el conjunto \textit{multiwindowing basic} seleccionado también se observó una redundancia elevada: 841 de las 1284 características fueron identificadas como redundantes, quedando 443 variables no redundantes.
+
+Uno de los resultados más relevantes del análisis exploratorio fue la elevada dimensionalidad y redundancia de las características radiómicas. Por este motivo, se evaluaron distintas estrategias de reducción no supervisada antes del modelado. En primer lugar, se aplicó \textit{Variance Threshold} con umbral 0,01, con el objetivo de eliminar variables con varianza muy baja. En segundo lugar, se eliminó redundancia lineal descartando características con correlación absoluta superior o igual a 0,95. Finalmente, se estimó el número de componentes principales necesarios para preservar el 90\%, 95\% y 99\% de la varianza mediante PCA. Como se resume en la Tabla~\ref{tab:reduccion_dimensionalidad_radiomics}, el conjunto \textit{basic} se redujo de 214 a 115 características tras eliminar variables redundantes, mientras que el conjunto \textit{extended} pasó de 2961 a 1325. Además, PCA permitió representar el 95\% de la varianza con 26 componentes en el conjunto \textit{basic} y 57 en el conjunto \textit{extended}, lo que indica que gran parte de la información radiómica puede concentrarse en un subespacio de menor dimensión. En el conjunto \textit{multiwindowing basic} seleccionado también se observó una redundancia elevada: 841 de las 1284 características fueron identificadas como redundantes, quedando 443 variables no redundantes.
+
+
+\begin{table}[!htbp]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.15}
+    \begin{tabular}{lrr}
+        \hline
+        \textbf{Etapa} & \textbf{Basic lung+nodule} & \textbf{Extended lung+nodule} \\
+        \hline
+        Dimensión inicial & 214 & 2961 \\
+        \textit{Variance Threshold} 0,01 & 158 & 1312 \\
+        Sin redundantes (Corr. $<0,95$) & 115 & 1325 \\
+        PCA 90\% & 17 & 32 \\
+        PCA 95\% & 26 & 57 \\
+        PCA 99\% & 48 & 119 \\
+        \hline
+    \end{tabular}
+    \caption{Reducción de dimensionalidad para los conjuntos de características radiómicas \textit{basic} y \textit{extended}.}
+    \label{tab:reduccion_dimensionalidad_radiomics}
+\end{table}
+
+Las matrices de correlación antes y después de eliminar variables redundantes se muestran en las Figuras~\ref{fig:eda_radiomics_corr_antes} y~\ref{fig:eda_radiomics_corr_despues}. Estas matrices corresponden al conjunto \textit{basic}, ya que las características \textit{extended} no se presentan debido a su elevada dimensionalidad, que dificultaría la visualización e interpretación del mapa de correlación. Antes del filtrado, se observan bloques de variables altamente correlacionadas, especialmente entre características pertenecientes a la misma familia. Tras aplicar el filtrado por correlación, la estructura queda más dispersa y se reduce de forma notable la presencia de relaciones casi lineales entre variables. Este resultado justifica la eliminación de características redundantes antes del entrenamiento de los modelos, al disminuir la dimensionalidad sin descartar necesariamente información clínica relevante.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{imagenes/radiomica/eda_radiomics_corr_basic_antes.png}
+    \caption{Matriz de correlación de las características radiómicas originales antes de eliminar variables redundantes.}
+    \label{fig:eda_radiomics_corr_antes}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{imagenes/radiomica/eda_radiomics_corr_basic_despues.png}
+    \caption{Matriz de correlación de las características radiómicas tras eliminar variables redundantes mediante filtrado por correlación absoluta superior o igual a 0,95.}
+    \label{fig:eda_radiomics_corr_despues}
+\end{figure}
+
+La distribución de las correlaciones absolutas por pares, representada en la Figura~\ref{fig:eda_radiomics_distribucion_correlaciones}, confirma esta reducción de redundancia. Aunque la mayor parte de las correlaciones se concentra en valores bajos o moderados, antes del filtrado existe una acumulación clara de pares con correlaciones cercanas a 1. Tras eliminar variables redundantes, esta acumulación se reduce, lo que justifica el uso de este paso como parte del preprocesamiento previo al modelado.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{imagenes/radiomica/eda_radiomics_distribucion_correlaciones.png}
+    \caption{Distribución de correlaciones absolutas entre pares de características antes y después de eliminar variables redundantes.}
+    \label{fig:eda_radiomics_distribucion_correlaciones}
+\end{figure}
+
+% Respecto a las etiquetas clínicas, el problema mantiene una estructura multietiqueta y presenta un desbalance importante. La etiqueta con mayor soporte es \textit{Sin complicación}, con 105 pacientes, seguida de \textit{Neumotórax}, con 64 casos, y \textit{Hemorragia}, con 49. En cambio, \textit{Derrame pleural} solo aparece en un paciente, por lo que no resulta adecuado extraer conclusiones específicas para esta complicación.
+
+% \begin{table}[!htbp]
+%     \centering
+%     \small
+%     \begin{tabular}{lr}
+%         \hline
+%         \textbf{Etiqueta} & \textbf{Número de positivos} \\
+%         \hline
+%         Derrame pleural & 1 \\
+%         Hemorragia & 49 \\
+%         Neumotórax & 64 \\
+%         Sin complicación & 105 \\
+%         \hline
+%     \end{tabular}
+%     \caption{Distribución de etiquetas clínicas empleadas en el análisis radiómico multietiqueta.}
+%     \label{tab:etiquetas_radiomics}
+% \end{table}
+
+% \begin{figure}[!htbp]
+%     \centering
+%     \includegraphics[width=0.75\textwidth]{imagenes/radiomica/eda_radiomics_correlacion_etiquetas.png}
+%     \caption{Matriz de correlación entre las etiquetas clínicas de complicación.}
+%     \label{fig:eda_radiomics_correlacion_etiquetas}
+% \end{figure}
+
+% La relación entre etiquetas clínicas se analizó mediante la matriz de correlación mostrada en la Figura~\ref{fig:eda_radiomics_correlacion_etiquetas}. Como era esperable, la etiqueta \textit{Sin complicación} presenta una correlación negativa con las complicaciones, especialmente con neumotórax y hemorragia. La correlación entre neumotórax y hemorragia también es negativa, lo que indica que, aunque existen pacientes con más de una complicación, ambas etiquetas no tienden a aparecer conjuntamente de forma mayoritaria. En el caso de derrame pleural, el bajo número de positivos impide extraer conclusiones sólidas.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/radiomica/eda_radiomics_top_correlaciones_basic.png}
+    \caption{Características radiómicas originales o \textit{basic} con mayor correlación absoluta respecto a cada etiqueta clínica de complicación.}
+    \label{fig:eda_radiomics_top_correlaciones_basic}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/radiomica/eda_radiomics_top_correlaciones_extended.png}
+    \caption{Características radiómicas extendidas con mayor correlación absoluta respecto a cada etiqueta clínica de complicación.}
+    \label{fig:eda_radiomics_top_correlaciones_extended}
+\end{figure}
+
+Finalmente, se analizó la correlación lineal entre las características radiómicas y las etiquetas clínicas de complicación. Para ello, se estudiaron por separado las características originales o \textit{basic} y las características \textit{extended}, como se muestra en las Figuras~\ref{fig:eda_radiomics_top_correlaciones_basic} y~\ref{fig:eda_radiomics_top_correlaciones_extended}. En ambos casos, las correlaciones individuales fueron moderadas, lo que indica que ninguna característica aislada explica por sí sola la aparición de complicaciones. En las características \textit{basic} aparecen descriptores de forma, intensidad y textura tanto del pulmón como del nódulo, mientras que en el conjunto \textit{extended} destacan principalmente variables derivadas de transformaciones como \textit{wavelet}, \textit{log-sigma} o \textit{logarithm}. Este resultado sugiere que la señal predictiva podría estar distribuida entre múltiples descriptores, por lo que el modelado posterior debe apoyarse en técnicas de selección de variables y algoritmos capaces de combinar información débil procedente de distintas familias radiómicas.
+
+
+
+\section{Modelado multietiqueta con características radiómicas y clínicas}
+
+Una vez establecida la formulación multietiqueta del problema, se ha abordado el modelado mediante características radiómicas y variables clínicas. Esta aproximación ha permitido evaluar modelos clásicos de aprendizaje automático sobre representaciones tabulares derivadas de la TC, comparando configuraciones basadas únicamente en radiómica, únicamente en información clínica y en la combinación de ambas fuentes.
+
+Como planteamiento principal de modelado se ha trabajado con las complicaciones de mayor interés clínico y con soporte muestral suficiente, en particular \textit{Hemorragia} y \textit{Neumotórax}. Los modelos se han entrenado únicamente para predecir estas dos etiquetas. El estado \textit{Sin complicación} no se ha considerado una tercera salida independiente, sino que se ha obtenido posteriormente mediante una regla determinista. Para cada paciente \(i\), el estado de ausencia de complicaciones se ha definido a partir de las etiquetas de hemorragia y neumotórax:
+
+\[
+y_{i,\mathrm{SC}} =
+\begin{cases}
+1, & \text{si } y_{i,\mathrm{H}}=0 \text{ y } y_{i,\mathrm{N}}=0,\\
+0, & \text{en cualquier otro caso},
+\end{cases}
+\]
+
+donde \(y_{i,\mathrm{H}}\) e \(y_{i,\mathrm{N}}\) representan, respectivamente, las etiquetas binarias de hemorragia y neumotórax. Por tanto, el estado \textit{Sin complicación} ha tomado el valor positivo únicamente cuando el paciente no ha presentado ninguna de las dos complicaciones.
+
+Esta misma regla se ha aplicado a las decisiones binarias generadas por el modelo para obtener el estado predicho de ausencia de complicaciones. En consecuencia, un paciente se ha clasificado como \textit{Sin complicación} cuando el modelo no ha predicho ni hemorragia ni neumotórax. Este estado no ha dispuesto de una salida, una probabilidad ni un clasificador independiente. Sus métricas se han calculado comparando los estados reales y predichos derivados en cada partición externa de prueba.
+
+La matriz de entrada se ha construido a nivel de paciente a partir de las características radiómicas extraídas y, cuando ha procedido, se ha ampliado con variables clínicas mediante una unión por identificador. Esto ha permitido comparar de forma homogénea configuraciones de solo radiómica, solo clínica y radiómica más clínica.
+
+Antes del entrenamiento, las variables se han sometido a un preprocesado realizado siempre dentro de cada partición para evitar fugas de información. Este flujo ha incluido la imputación de valores ausentes mediante la mediana, el escalado opcional de las variables y la reducción opcional de la dimensionalidad. Como estrategias de escalado se han considerado \texttt{StandardScaler}, \texttt{MinMaxScaler} y la opción de no aplicar escalado cuando la familia de modelos no lo requería. Para la reducción de dimensionalidad se han evaluado las alternativas \texttt{none}, \texttt{VarianceThreshold} con un umbral de \(0{,}01\), y \texttt{PCA} reteniendo el \(90\%\), el \(95\%\) o el \(99\%\) de la varianza, según la configuración.
+
+Para adaptar los clasificadores convencionales al escenario multietiqueta se han considerado tres estrategias de descomposición: \textit{one-vs-rest}, \textit{classifier chain} y \textit{multi-output}. La estrategia \textit{one-vs-rest} ha permitido entrenar un clasificador binario independiente para cada etiqueta; \textit{classifier chain} ha introducido una dependencia secuencial entre las etiquetas, con el propósito de representar posibles relaciones entre las complicaciones; y \textit{multi-output} se ha reservado para las familias de modelos directamente compatibles con esta formulación.
+
+Sobre este esquema se ha definido un espacio de búsqueda amplio de modelos clásicos. Las familias consideradas en los distintos grids han incluido:
+
+\begin{itemize}
+    \item \texttt{LogisticRegression}.
+    \item \texttt{SVM} lineal y RBF.
+    \item \texttt{KNN}.
+    \item \texttt{DecisionTree}.
+    \item \texttt{RandomForest}.
+    \item \texttt{ExtraTrees}.
+    \item \texttt{GradientBoosting}.
+    \item \texttt{AdaBoost}.
+    \item \texttt{XGBoost}.
+    \item \texttt{LightGBM}.
+\end{itemize}
+
+De forma exploratoria también se consideraron \texttt{CatBoost} y \texttt{TabPFN}, aunque finalmente no se incorporaron al conjunto principal de experimentos. \texttt{CatBoost} mostraba un coste computacional elevado en algunas configuraciones, mientras que \texttt{TabPFN} presentaba mayores restricciones de aplicación en este problema multietiqueta y con espacios de variables amplios.
+
+Además del clasificador, se exploraron distintas fuentes de características y selecciones de máscaras. Se compararon conjuntos radiómicos \texttt{basic} y \texttt{extended}, variantes derivadas de distintos preprocesados de imagen, configuraciones de solo clínica y combinaciones radiómica más clínica. También se evaluaron máscaras individuales, como \texttt{nodule}, \texttt{lung}, \texttt{vessels} o \texttt{trachea\_bronchia}, y combinaciones con varias regiones como \texttt{lung+nodule}, \texttt{nodule+vessels} o \texttt{lung+nodule+trachea\_bronchia}.
+
+Finalmente, para analizar el efecto del desbalanceo se consideraron medidas como \texttt{class\_weight=balanced}, \texttt{balanced\_subsample} en ensamblados basados en árboles y, en experimentos específicos, sobremuestreo controlado con \texttt{RandomOverSampler} y \texttt{SMOTE}. Estas estrategias se evaluaron sobre configuraciones ya competitivas, en lugar de incorporarse de forma indiscriminada al grid principal.
+
+
+\section{Análisis experimental de la radiómica}
+
+En esta sección se presenta la experimentación realizada de radiómica, los resultados obtenidos y su interpretación.
+
+\subsection{Configuración experimental}
+
+La experimentación radiómica se ha diseñado para comparar de forma controlada cuatro ejes de representación: el tipo de características radiómicas (\texttt{basic} frente a \texttt{extended}), la región anatómica segmentada, la familia de preprocesado de imagen y la incorporación de variables clínicas. Sobre estas configuraciones se han evaluado distintas estrategias multietiqueta.
+
+Todas las comparaciones se han realizado sobre una cohorte común de 206 pacientes, obtenida mediante la intersección de los casos con información clínica y aquellos con imágenes y segmentaciones utilizables. De este modo, las diferencias entre las variantes radiómicas no han estado condicionadas por cambios en la composición de la cohorte.
+
+\subsection{Validación}
+
+La evaluación de todas las configuraciones se realizó mediante validación cruzada de 5 folds. Según la naturaleza del experimento, se utilizaron particiones \texttt{kfold} o variantes \texttt{labelset\_stratified} cuando la distribución de combinaciones de etiquetas lo permitía. Cuando esta estratificación no era estable por falta de soporte en algunos \textit{labelsets}, se recurrió a un esquema no estratificado.
+
+Para evitar fuga de información, todas las operaciones de preprocesado se ajustaron exclusivamente con los datos de entrenamiento de cada fold y se aplicaron después al subconjunto de validación correspondiente. Esto incluye la imputación de valores ausentes, el escalado, la reducción de dimensionalidad y cualquier transformación de características integrada en el pipeline.
+
+\subsection{Métricas}\label{subsec:metricas_radiomica}
+
+% Dado el carácter multietiqueta del problema, la evaluación se basó en métricas globales y complementarias.
+
+% La métrica principal fue el \textit{F1 micro}, que agrega conjuntamente todas las decisiones binarias del problema y ofrece una visión global del rendimiento:
+% \[
+% F1_{\text{micro}} = \frac{2 \, TP}{2 \, TP + FP + FN},
+% \]
+% donde \(TP\), \(FP\) y \(FN\) representan, respectivamente, el número total de verdaderos positivos, falsos positivos y falsos negativos acumulados sobre todas las etiquetas.
+
+% Como medida complementaria se utilizó el \textit{F1 macro}, que calcula el F1 de cada etiqueta por separado y después obtiene su media aritmética:
+% \[
+% F1_{\text{macro}} = \frac{1}{L}\sum_{l=1}^{L} F1_l,
+% \]
+
+% donde \(L\) es el número de etiquetas y \(F1_l\) el valor de F1 para la etiqueta \(l\). Esta métrica resulta útil para valorar el comportamiento medio por complicación y es más sensible al desbalanceo entre etiquetas.
+
+% También se consideró la \textit{subset accuracy}, que exige acertar simultáneamente el vector completo de etiquetas de cada paciente:
+% \[
+% \text{Subset accuracy} = \frac{1}{N}\sum_{i=1}^{N}\mathbf{1}(\mathbf{y}_i = \hat{\mathbf{y}}_i),
+% \]
+% donde \(N\) es el número de pacientes, \(\mathbf{y}_i\) es el vector real de etiquetas y \(\hat{\mathbf{y}}_i\) el vector predicho.
+
+% La \textit{Hamming loss} cuantifica la proporción de etiquetas mal clasificadas:
+% \[
+% \text{Hamming loss} = \frac{1}{N \cdot L}\sum_{i=1}^{N}\sum_{l=1}^{L}\mathbf{1}(y_{il} \neq \hat{y}_{il}).
+% \]
+% A diferencia de la \textit{subset accuracy}, esta métrica penaliza error por error y no exige acertar todo el vector de etiquetas a la vez.
+
+% De forma adicional se analizaron \textit{precision micro}, \textit{recall micro}, \textit{Jaccard micro} y métricas por etiqueta.
+
+% La \textit{precision micro} mide la proporción de predicciones positivas correctas sobre el total de predicciones positivas realizadas:
+% \[
+% \text{Precision}_{\text{micro}} = \frac{TP}{TP + FP}.
+% \]
+
+% La \textit{recall micro} mide la proporción de positivos reales que el modelo consigue recuperar:
+% \[
+% \text{Recall}_{\text{micro}} = \frac{TP}{TP + FN}.
+% \]
+
+% Por su parte, el \textit{Jaccard micro} cuantifica la coincidencia global entre etiquetas reales y predichas:
+% \[
+% \text{Jaccard}_{\text{micro}} = \frac{TP}{TP + FP + FN}.
+% \]
+
+Dado el carácter multietiqueta del problema, la evaluación se ha basado en métricas globales calculadas exclusivamente sobre las dos salidas modeladas, hemorragia y neumotórax. Para cada configuración, las etiquetas reales y predichas forman matrices binarias de dimensión \(N \times 2\).
+
+La métrica principal ha sido el \textit{F1 micro}, que agrega las decisiones de ambas complicaciones antes de calcular la puntuación.
+
+\[
+F1_{\text{micro}} = \frac{2 \, TP}{2 \, TP + FP + FN},
+\]
+
+\[
+TP=TP_{\mathrm{H}}+TP_{\mathrm{N}}, \qquad
+FP=FP_{\mathrm{H}}+FP_{\mathrm{N}}, \qquad
+FN=FN_{\mathrm{H}}+FN_{\mathrm{N}}.
+\]
+
+Como medida complementaria se ha utilizado el \textit{F1 macro}, definido como la media no ponderada de los F1 de hemorragia y neumotórax.
+
+\[
+F1_{\text{macro}} = \frac{F1_{\mathrm{H}}+F1_{\mathrm{N}}}{2}.
+\]
+
+El estado \textit{Sin complicación} se ha derivado después de binarizar las dos salidas y se ha evaluado por separado. Por tanto, su puntuación F1 no interviene en el F1 micro ni en el F1 macro globales.
+
+También se ha considerado la \textit{subset accuracy}, que exige acertar simultáneamente las dos decisiones de cada paciente.
+
+\[
+\text{Subset accuracy} = \frac{1}{N}\sum_{i=1}^{N}\mathbf{1}(\mathbf{y}_i = \hat{\mathbf{y}}_i),
+\]
+
+donde \(\mathbf{y}_i\) y \(\hat{\mathbf{y}}_i\) contienen las decisiones de hemorragia y neumotórax.
+
+La \textit{Hamming loss} cuantifica la proporción de decisiones binarias mal clasificadas.
+
+\[
+\text{Hamming loss} = \frac{1}{2N}\sum_{i=1}^{N}\sum_{l \in \{\mathrm{H},\mathrm{N}\}}\mathbf{1}(y_{il} \neq \hat{y}_{il}).
+\]
+
+A diferencia de la \textit{subset accuracy}, esta métrica penaliza cada error por separado y no exige acertar el vector completo.
+
+De forma adicional se han analizado la \textit{precision micro}, la \textit{recall micro}, el \textit{Jaccard micro} y las métricas por resultado. Las tres primeras se han calculado con los mismos conteos acumulados de hemorragia y neumotórax.
+
+\[
+\text{Precision}_{\text{micro}} = \frac{TP}{TP + FP}, \qquad
+\text{Recall}_{\text{micro}} = \frac{TP}{TP + FN},
+\]
+
+\[
+\text{Jaccard}_{\text{micro}} = \frac{TP}{TP + FP + FN}.
+\]
+
+
+En estas expresiones, \(TP\), \(FP\) y \(FN\) representan los verdaderos positivos, falsos positivos y falsos negativos acumulados sobre todas las etiquetas.
+
+Además, se calcularon métricas por etiqueta, evaluando cada complicación de forma independiente. Para una etiqueta \(l\), la precisión, la exhaustividad y la puntuación F1 se definen como:
+\[
+\text{Precision}_l = \frac{TP_l}{TP_l + FP_l}, \qquad
+\text{Recall}_l = \frac{TP_l}{TP_l + FN_l},
+\]
+\[
+F1_l = \frac{2 \cdot \text{Precision}_l \cdot \text{Recall}_l}{\text{Precision}_l + \text{Recall}_l}.
+\]
+
+
+\subsection{Descripción de los experimentos}
+
+Los experimentos se han organizado como una secuencia de comparaciones controladas. Primero se ha establecido una referencia reproducible sobre la cohorte común; después se ha evaluado el efecto del tipo de características y de la región segmentada; posteriormente se han comparado los distintos preprocesados; y, por último, se ha analizado la incorporación de variables clínicas y el tratamiento del desbalanceo. Las comparaciones con soporte muestral suficiente y un coste computacional razonable se han considerado principales, mientras que los espacios de búsqueda más amplios, las combinaciones de máscaras más complejas y las familias adicionales de modelos se han interpretado como análisis exploratorios.
+
+\subsection{Resultados y análisis}
+
+A partir de los experimentos, los mejores resultados globales se concentraron en un conjunto reducido de configuraciones con rendimiento muy similar.
+
+% La Tabla~\ref{tab:top_modelos_radiomica} presenta los mejores resultados de las configuraciones evaluadas. Las métricas se han calculado sobre la representación final formada por \textit{Hemorragia}, \textit{Neumotórax} y el estado derivado \textit{Sin\_complicación}. La mejor configuración global ha sido R02, basada en características \texttt{basic} extraídas de la máscara de nódulo y un modelo \textit{ExtraTrees}, con un F1 micro de 0.6275, un F1 macro de 0.5427, una \textit{subset accuracy} de 0.6154 y una \textit{Hamming loss} de 0.2564. Las configuraciones R03, R04 y R05 han obtenido valores muy próximos, con F1 micro entre 0.6259 y 0.6262.
+
+% Las ocho primeras posiciones han correspondido a variantes de \textit{ExtraTrees} construidas sobre características \texttt{basic} de las máscaras de nódulo o de pulmón y nódulo. Este resultado indica que el aumento de la complejidad de la representación mediante características \texttt{extended}, múltiples regiones anatómicas o modelos más complejos no ha producido una mejora sistemática. No obstante, R07, basada en \textit{GradientBoosting} y variables clínicas completas, ha alcanzado el mayor F1 macro, con un valor de 0.5711, aunque su F1 micro ha sido ligeramente inferior, de 0.6164. Esto sugiere un comportamiento más equilibrado entre etiquetas, pero no una mejora del rendimiento global. En conjunto, las diferencias reducidas entre las primeras configuraciones y los valores de \textit{subset accuracy} próximos a 0.60 muestran una capacidad predictiva moderada y la ausencia de un modelo claramente dominante.
+
+% Para describir la información empleada en cada configuración, la Tabla~\ref{tab:top_modelos_radiomica} ha incluido la columna \textit{Datos adicionales}, en la que se ha indicado, cuando corresponde, el uso de variables complementarias a las características radiómicas.
+
+La Tabla~\ref{tab:top_modelos_radiomica} presenta los mejores resultados de las configuraciones evaluadas. La mejor configuración según F1 micro ha sido R07, que combina características \texttt{basic} de pulmón, nódulo y vasos con variables clínicas completas mediante \textit{GradientBoosting}. Ha alcanzado un F1 micro de 0.4948, un F1 macro de 0.5011, una \textit{subset accuracy} de 0.6000 y una \textit{Hamming loss} de 0.2390. R10 ha ocupado la segunda posición con un F1 micro de 0.4767. Las mejores configuraciones sin variables clínicas adicionales han sido R04 y R05, ambas con un F1 micro de 0.4524, mientras que R02 ha alcanzado 0.4485.
+
+Con los umbrales seleccionados dentro del entrenamiento externo, R07 también ha obtenido el mayor F1 micro, con 0.4878, y un F1 macro de 0.4888. Estos valores no han superado los obtenidos por la misma configuración con la decisión predeterminada.
+
+Las dos primeras posiciones corresponden a configuraciones que combinan características radiómicas \texttt{basic} y variables clínicas. Este resultado muestra que las representaciones ampliadas con características \texttt{extended} o modelos de mayor complejidad no han producido mejoras sistemáticas.
+
+
+% \begin{landscape}
+% \begin{table}[p]
+% \centering
+% \tiny
+% \setlength{\tabcolsep}{1.3pt}
+% \renewcommand{\arraystretch}{0.85}
+
+% \begin{adjustbox}{max width=\linewidth, max height=0.88\textheight, keepaspectratio}
+% \begin{tabular}{l l l l l l l l l r r r r r r r}
+% \hline
+% ID & Preprocesado & Features & Datos adicionales & Máscaras & Modelo & Scaler & Red. dim. & Parámetros & F1 micro & F1 macro & Subset acc. & Hamming loss & Jaccard micro & Precision micro & Recall micro \\
+% \hline
+% R01 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.1, depth=5, n=100 & 0.6222 & 0.5263 & 0.6098 & 0.2585 & 0.4534 & 0.6324 & 0.6125 \\
+% R02 & (128,128,128) original & basic & -- & nodule & ExtraTrees & none & none & depth=10, n=100, minsplit=5 & 0.6201 & 0.5392 & 0.6000 & 0.2581 & 0.4531 & 0.6381 & 0.6032 \\
+% R03 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & none & none & depth=10, n=200, minsplit=2 & 0.6190 & 0.5339 & 0.5854 & 0.2585 & 0.4503 & 0.6366 & 0.6030 \\
+% R04 & (128,128,128) original & basic & -- & nodule & ExtraTrees & minmax & none & depth=10, n=50, minsplit=5 & 0.6189 & 0.5332 & 0.6000 & 0.2598 & 0.4504 & 0.6356 & 0.6032 \\
+% R05 & (128,128,128) original & basic & -- & nodule & ExtraTrees & none & none & depth=10, n=50, minsplit=5 & 0.6189 & 0.5332 & 0.6000 & 0.2598 & 0.4504 & 0.6356 & 0.6032 \\
+% R06 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.1, depth=10, n=100 & 0.6174 & 0.5139 & 0.6049 & 0.2618 & 0.4488 & 0.6276 & 0.6079 \\
+% R07 & (sin ventana HU explícita) & basic & \texttt{clin\_full} & lung+nodule+vessels & GradientBoosting & none & varth\_0.01 & lr=0.1, depth=3, n=200 & 0.6164 & 0.5711 & 0.6000 & 0.2650 & - & 0.6207 & 0.6122 \\
+% R08 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.1, depth=10, n=100 & 0.6160 & 0.5125 & 0.6000 & 0.2634 & 0.4473 & 0.6247 & 0.6079 \\
+% R09 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.1, depth=10, n=100 & 0.6160 & 0.5125 & 0.6000 & 0.2634 & 0.4473 & 0.6247 & 0.6079 \\
+% R10 & (sin ventana HU explícita) & basic & \texttt{clin\_sd} & lung+nodule+vessels & GradientBoosting & none & varth\_0.01 & lr=0.03, depth=3, n=400 & 0.6151 & 0.5615 & 0.5805 & 0.2667 & - & 0.6180 & 0.6123 \\
+% R11 & (sin ventana HU explícita) & basic & -- & vessels & LightGBM & none & varth\_0.01 & lr=0.1, depth=6, n=700, leaves=31 & 0.6146 & 0.5239 & 0.5854 & 0.2650 & - & 0.6219 & 0.6078 \\
+% R12 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.01, depth=5, n=200 & 0.6143 & 0.4817 & 0.6049 & 0.2634 & 0.4445 & 0.6261 & 0.6030 \\
+% R13 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.1, depth=5, n=100 & 0.6127 & 0.5156 & 0.6000 & 0.2650 & 0.4440 & 0.6227 & 0.6032 \\
+% R14 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.1, depth=5, n=100 & 0.6127 & 0.5156 & 0.6000 & 0.2650 & 0.4440 & 0.6227 & 0.6032 \\
+% R15 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & std & none & depth=10, n=100, minsplit=2 & 0.6121 & 0.5252 & 0.5756 & 0.2618 & 0.4432 & 0.6322 & 0.5937 \\
+% R16 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & minmax & none & depth=10, n=100, minsplit=2 & 0.6120 & 0.5257 & 0.5756 & 0.2618 & 0.4425 & 0.6319 & 0.5937 \\
+% R17 & (128,128,128) original & basic & -- & nodule & ExtraTrees & minmax & none & depth=10, n=100, minsplit=5 & 0.6118 & 0.5341 & 0.5897 & 0.2650 & 0.4449 & 0.6261 & 0.5983 \\
+% R18 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & none & none & depth=10, n=100, minsplit=2 & 0.6112 & 0.5259 & 0.5707 & 0.2650 & 0.4419 & 0.6251 & 0.5982 \\
+% R19 & (sin ventana HU explícita) & extended & \texttt{clin\_sd\_geom} & lung+nodule+vessels & XGBoost & none & varth\_0.01 & lr=0.03, depth=6, n=700 & 0.6112 & 0.5205 & 0.5805 & 0.2699 & - & 0.6146 & 0.6080 \\
+% R20 & (128,128,128) original & basic & -- & nodule & ExtraTrees & std & none & depth=10, n=50, minsplit=5 & 0.6104 & 0.5159 & 0.5949 & 0.2650 & 0.4418 & 0.6285 & 0.5934 \\
+% R21 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.01, depth=5, n=200 & 0.6095 & 0.4726 & 0.6000 & 0.2667 & 0.4398 & 0.6213 & 0.5983 \\
+% R22 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.01, depth=5, n=200 & 0.6095 & 0.4726 & 0.6000 & 0.2667 & 0.4398 & 0.6213 & 0.5983 \\
+% R23 & (128,128,128) HU [-1000,400] & basic & -- & lung+nodule+trachea\_bronchia+vessels & LightGBM & minmax & none & lr=0.1, n=200, leaves=31 & 0.6084 & 0.5209 & 0.5902 & 0.2699 & 0.4393 & 0.6142 & 0.6032 \\
+% R24 & (128,128,128) HU [-1000,400] & basic & -- & lung+nodule+trachea\_bronchia+vessels & LightGBM & minmax & none & lr=0.1, n=200, leaves=50 & 0.6084 & 0.5209 & 0.5902 & 0.2699 & 0.4393 & 0.6142 & 0.6032 \\
+% R25 & (sin ventana HU explícita) & basic & \texttt{clin\_sd\_geom} & nodule+vessels & LightGBM & none & varth\_0.01 & lr=0.03, depth=6, n=300, leaves=31 & 0.6082 & 0.5021 & 0.5805 & 0.2683 & - & 0.6188 & 0.5981 \\
+% R26 & (sin ventana HU explícita) & extended & \texttt{clin\_sd} & lung+nodule+vessels & XGBoost & none & varth\_0.01 & lr=0.03, depth=6, n=700 & 0.6077 & 0.5237 & 0.5805 & 0.2715 & - & 0.6123 & 0.6033 \\
+% R27 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.01, n=200 & 0.6063 & 0.4678 & 0.6000 & 0.2683 & 0.4360 & 0.6195 & 0.5936 \\
+% \hline
+% \end{tabular}
+% \end{adjustbox}
+
+% \caption{Mejores configuraciones obtenidas en los experimentos de clasificación multietiqueta con estrategia \textit{chain}, ordenadas de mayor a menor F1 micro.}
+% \label{tab:top_modelos_radiomica}
+% \end{table}
+% \end{landscape}
+
+
+% Tabla global actualizada: decisión predeterminada;
+% Sin complicación se ha derivado de las dos salidas modeladas.
+% \begin{landscape}
+% \begin{table}[p]
+% \centering
+% \tiny
+% \setlength{\tabcolsep}{1.3pt}
+% \renewcommand{\arraystretch}{0.85}
+
+% \begin{adjustbox}{
+%     max width=\linewidth,
+%     max height=0.88\textheight,
+%     keepaspectratio
+% }
+% \begin{tabular}{l l l l l l l l l r r r r r r r}
+% \hline
+% ID & Preprocesado & Features & Datos adicionales & Máscaras &
+% Modelo & Scaler & Red. dim. & Parámetros &
+% F1 micro & F1 macro & Subset acc. & Hamming loss &
+% Jaccard micro & Precision micro & Recall micro \\
+% \hline
+% R02 & (128,128,128) original & basic & -- & nodule & ExtraTrees & none & none & depth=10, n=100, minsplit=5 & 0.6275 & 0.5427 & 0.6154 & 0.2564 & 0.4606 & 0.6375 & 0.6179 \\
+% R03 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & none & none & depth=10, n=200, minsplit=2 & 0.6262 & 0.5364 & 0.6049 & 0.2585 & 0.4582 & 0.6311 & 0.6216 \\
+% R04 & (128,128,128) original & basic & -- & nodule & ExtraTrees & minmax & none & depth=10, n=50, minsplit=5 & 0.6259 & 0.5365 & 0.6154 & 0.2581 & 0.4572 & 0.6341 & 0.6179 \\
+% R05 & (128,128,128) original & basic & -- & nodule & ExtraTrees & none & none & depth=10, n=50, minsplit=5 & 0.6259 & 0.5365 & 0.6154 & 0.2581 & 0.4572 & 0.6341 & 0.6179 \\
+% R15 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & std & none & depth=10, n=100, minsplit=2 & 0.6227 & 0.5296 & 0.6000 & 0.2602 & 0.4544 & 0.6287 & 0.6169 \\
+% R16 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & minmax & none & depth=10, n=100, minsplit=2 & 0.6226 & 0.5300 & 0.6000 & 0.2602 & 0.4539 & 0.6286 & 0.6169 \\
+% R18 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & none & none & depth=10, n=100, minsplit=2 & 0.6217 & 0.5301 & 0.5951 & 0.2634 & 0.4533 & 0.6220 & 0.6215 \\
+% R17 & (128,128,128) original & basic & -- & nodule & ExtraTrees & minmax & none & depth=10, n=100, minsplit=5 & 0.6208 & 0.5387 & 0.6051 & 0.2615 & 0.4539 & 0.6290 & 0.6130 \\
+% R01 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.1, depth=5, n=100 & 0.6208 & 0.5261 & 0.6049 & 0.2602 & 0.4511 & 0.6300 & 0.6123 \\
+% R20 & (128,128,128) original & basic & -- & nodule & ExtraTrees & std & none & depth=10, n=50, minsplit=5 & 0.6174 & 0.5192 & 0.6103 & 0.2632 & 0.4486 & 0.6271 & 0.6082 \\
+% R07 & (sin ventana HU explícita) & basic & \texttt{clin\_full} & lung+nodule+vessels & GradientBoosting & none & varth\_0.01 & lr=0.1, depth=3, n=200 & 0.6164 & 0.5711 & 0.6000 & 0.2650 & 0.4472 & 0.6207 & 0.6122 \\
+% R12 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.01, depth=5, n=200 & 0.6158 & 0.4827 & 0.6098 & 0.2618 & 0.4469 & 0.6293 & 0.6030 \\
+% R21 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.01, depth=5, n=200 & 0.6158 & 0.4827 & 0.6098 & 0.2618 & 0.4469 & 0.6293 & 0.6030 \\
+% R10 & (sin ventana HU explícita) & basic & \texttt{clin\_sd} & lung+nodule+vessels & GradientBoosting & none & varth\_0.01 & lr=0.03, depth=3, n=400 & 0.6151 & 0.5615 & 0.5805 & 0.2667 & 0.4470 & 0.6180 & 0.6123 \\
+% R11 & (sin ventana HU explícita) & basic & -- & vessels & LightGBM & none & varth\_0.01 & lr=0.1, depth=6, n=700, leaves=31 & 0.6146 & 0.5239 & 0.5854 & 0.2650 & 0.4472 & 0.6219 & 0.6078 \\
+% R13 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.1, depth=5, n=100 & 0.6113 & 0.5154 & 0.5951 & 0.2667 & 0.4412 & 0.6203 & 0.6030 \\
+% R19 & (sin ventana HU explícita) & extended & \texttt{clin\_sd\_geom} & lung+nodule+vessels & XGBoost & none & varth\_0.01 & lr=0.03, depth=6, n=700 & 0.6112 & 0.5205 & 0.5805 & 0.2699 & 0.4426 & 0.6146 & 0.6080 \\
+% R22 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.01, depth=5, n=200 & 0.6110 & 0.4790 & 0.6049 & 0.2650 & 0.4417 & 0.6244 & 0.5982 \\
+% R25 & (sin ventana HU explícita) & basic & \texttt{clin\_sd\_geom} & nodule+vessels & LightGBM & none & varth\_0.01 & lr=0.03, depth=6, n=300, leaves=31 & 0.6082 & 0.5021 & 0.5805 & 0.2683 & 0.4403 & 0.6188 & 0.5981 \\
+% R08 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.1, depth=10, n=100 & 0.6080 & 0.5091 & 0.5951 & 0.2683 & 0.4384 & 0.6180 & 0.5984 \\
+% R09 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.1, depth=10, n=100 & 0.6080 & 0.5075 & 0.6000 & 0.2683 & 0.4384 & 0.6180 & 0.5984 \\
+% R26 & (sin ventana HU explícita) & extended & \texttt{clin\_sd} & lung+nodule+vessels & XGBoost & none & varth\_0.01 & lr=0.03, depth=6, n=700 & 0.6077 & 0.5237 & 0.5805 & 0.2715 & 0.4394 & 0.6123 & 0.6033 \\
+% R14 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.1, depth=5, n=100 & 0.6065 & 0.5056 & 0.5951 & 0.2699 & 0.4361 & 0.6154 & 0.5983 \\
+% R06 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.1, depth=10, n=100 & 0.6032 & 0.4988 & 0.5951 & 0.2715 & 0.4333 & 0.6132 & 0.5938 \\
+% R23 & (128,128,128) HU [-1000,400] & basic & -- & lung+nodule+trachea\_bronchia+vessels & LightGBM & minmax & none & lr=0.1, n=200, leaves=31 & 0.5974 & 0.5116 & 0.5805 & 0.2780 & 0.4267 & 0.6015 & 0.5938 \\
+% R24 & (128,128,128) HU [-1000,400] & basic & -- & lung+nodule+trachea\_bronchia+vessels & LightGBM & minmax & none & lr=0.1, n=200, leaves=50 & 0.5974 & 0.5116 & 0.5805 & 0.2780 & 0.4267 & 0.6015 & 0.5938 \\
+% R27 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.01, n=200 & 0.5920 & 0.4521 & 0.5854 & 0.2780 & 0.4221 & 0.6049 & 0.5797 \\
+% \hline
+% \end{tabular}
+% \end{adjustbox}
+
+% \caption{Resultados globales de las mejores configuraciones de clasificación multietiqueta, ordenadas de mayor a menor F1 micro.}
+% \label{tab:top_modelos_radiomica}
+% \end{table}
+% \end{landscape}
+\begin{landscape}
+\begin{table}[p]
+\centering
+\tiny
+\setlength{\tabcolsep}{1.2pt}
+\renewcommand{\arraystretch}{0.85}
+
+\begin{adjustbox}{
+    max width=\linewidth,
+    max height=0.88\textheight,
+    keepaspectratio
+}
+\begin{tabular}{l l l l l l l l l r r r r r r r}
+\hline
+ID & Preprocesado & Features & Datos adicionales & Máscaras &
+Modelo & Scaler & Red. dim. & Parámetros &
+F1 micro & F1 macro & Subset acc. & Hamming loss &
+Jaccard micro & Precision micro & Recall micro \\
+\hline
+R07 & (sin ventana HU explícita) & basic & \texttt{clin\_full} & lung+nodule+vessels & GradientBoosting & none & varth\_0.01 & lr=0.1, depth=3, n=200 & 0.4948 & 0.5011 & 0.6000 & 0.2390 & 0.3288 & 0.5783 & 0.4324 \\
+R10 & (sin ventana HU explícita) & basic & \texttt{clin\_sd} & lung+nodule+vessels & GradientBoosting & none & varth\_0.01 & lr=0.03, depth=3, n=400 & 0.4767 & 0.4803 & 0.5805 & 0.2463 & 0.3129 & 0.5610 & 0.4144 \\
+R04 & (128,128,128) original & basic & -- & nodule & ExtraTrees & minmax & none & depth=10, n=50, minsplit=5 & 0.4524 & 0.4375 & 0.6154 & 0.2359 & 0.2923 & 0.6230 & 0.3551 \\
+R05 & (128,128,128) original & basic & -- & nodule & ExtraTrees & none & none & depth=10, n=50, minsplit=5 & 0.4524 & 0.4375 & 0.6154 & 0.2359 & 0.2923 & 0.6230 & 0.3551 \\
+R02 & (128,128,128) original & basic & -- & nodule & ExtraTrees & none & none & depth=10, n=100, minsplit=5 & 0.4485 & 0.4394 & 0.6154 & 0.2333 & 0.2891 & 0.6379 & 0.3458 \\
+R11 & (sin ventana HU explícita) & basic & -- & vessels & LightGBM & none & varth\_0.01 & lr=0.1, depth=6, n=700, leaves=31 & 0.4468 & 0.4301 & 0.5854 & 0.2537 & 0.2877 & 0.5455 & 0.3784 \\
+R17 & (128,128,128) original & basic & -- & nodule & ExtraTrees & minmax & none & depth=10, n=100, minsplit=5 & 0.4431 & 0.4340 & 0.6051 & 0.2385 & 0.2846 & 0.6167 & 0.3458 \\
+R25 & (sin ventana HU explícita) & basic & \texttt{clin\_sd\_geom} & nodule+vessels & LightGBM & none & varth\_0.01 & lr=0.03, depth=6, n=300, leaves=31 & 0.4420 & 0.4125 & 0.5805 & 0.2463 & 0.2837 & 0.5714 & 0.3604 \\
+R01 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.1, depth=5, n=100 & 0.4405 & 0.4216 & 0.6049 & 0.2293 & 0.2824 & 0.6379 & 0.3364 \\
+R26 & (sin ventana HU explícita) & extended & \texttt{clin\_sd} & lung+nodule+vessels & XGBoost & none & varth\_0.01 & lr=0.03, depth=6, n=700 & 0.4379 & 0.4288 & 0.5805 & 0.2317 & 0.2803 & 0.6379 & 0.3333 \\
+R03 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & none & none & depth=10, n=200, minsplit=2 & 0.4337 & 0.4349 & 0.6049 & 0.2293 & 0.2769 & 0.6429 & 0.3273 \\
+R20 & (128,128,128) original & basic & -- & nodule & ExtraTrees & std & none & depth=10, n=50, minsplit=5 & 0.4311 & 0.4089 & 0.6103 & 0.2436 & 0.2748 & 0.6000 & 0.3364 \\
+R13 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.1, depth=5, n=100 & 0.4286 & 0.4118 & 0.5951 & 0.2341 & 0.2727 & 0.6207 & 0.3273 \\
+R15 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & std & none & depth=10, n=100, minsplit=2 & 0.4268 & 0.4246 & 0.6000 & 0.2293 & 0.2713 & 0.6481 & 0.3182 \\
+R16 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & minmax & none & depth=10, n=100, minsplit=2 & 0.4268 & 0.4255 & 0.6000 & 0.2293 & 0.2713 & 0.6481 & 0.3182 \\
+R19 & (sin ventana HU explícita) & extended & \texttt{clin\_sd\_geom} & lung+nodule+vessels & XGBoost & none & varth\_0.01 & lr=0.03, depth=6, n=700 & 0.4260 & 0.4189 & 0.5805 & 0.2366 & 0.2707 & 0.6207 & 0.3243 \\
+R08 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.1, depth=10, n=100 & 0.4250 & 0.4113 & 0.5951 & 0.2244 & 0.2698 & 0.6800 & 0.3091 \\
+R09 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.1, depth=10, n=100 & 0.4250 & 0.4062 & 0.6000 & 0.2244 & 0.2698 & 0.6800 & 0.3091 \\
+R18 & (128,128,128) original & basic & -- & lung+nodule & ExtraTrees & none & none & depth=10, n=100, minsplit=2 & 0.4235 & 0.4253 & 0.5951 & 0.2390 & 0.2687 & 0.6000 & 0.3273 \\
+R14 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.1, depth=5, n=100 & 0.4192 & 0.3989 & 0.5951 & 0.2366 & 0.2652 & 0.6140 & 0.3182 \\
+R06 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.1, depth=10, n=100 & 0.4125 & 0.3958 & 0.5951 & 0.2293 & 0.2598 & 0.6600 & 0.3000 \\
+R23 & (128,128,128) HU [-1000,400] & basic & -- & lung+nodule+trachea\_bronchia+vessels & LightGBM & minmax & none & lr=0.1, n=200, leaves=31 & 0.4022 & 0.4013 & 0.5805 & 0.2610 & 0.2517 & 0.5217 & 0.3273 \\
+R24 & (128,128,128) HU [-1000,400] & basic & -- & lung+nodule+trachea\_bronchia+vessels & LightGBM & minmax & none & lr=0.1, n=200, leaves=50 & 0.4022 & 0.4013 & 0.5805 & 0.2610 & 0.2517 & 0.5217 & 0.3273 \\
+R12 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.01, depth=5, n=200 & 0.3893 & 0.3687 & 0.6098 & 0.2220 & 0.2417 & 0.7436 & 0.2636 \\
+R21 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & minmax & none & lr=0.01, depth=5, n=200 & 0.3893 & 0.3687 & 0.6098 & 0.2220 & 0.2417 & 0.7436 & 0.2636 \\
+R22 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & none & none & lr=0.01, depth=5, n=200 & 0.3867 & 0.3662 & 0.6049 & 0.2244 & 0.2397 & 0.7250 & 0.2636 \\
+R27 & (128,128,128) HU [-1350,150] & extended & -- & lung+nodule+trachea\_bronchia & XGBoost & std & none & lr=0.01, n=200 & 0.3333 & 0.3238 & 0.5854 & 0.2341 & 0.2000 & 0.7059 & 0.2182 \\
+\hline
+\end{tabular}
+\end{adjustbox}
+
+\caption{Resultados globales de las configuraciones finales de radiómica de clasificación multietiqueta.}
+\label{tab:top_modelos_radiomica}
+\end{table}
+\end{landscape}
+
+
+El rendimiento se ha desglosado para hemorragia, neumotórax y el estado derivado \textit{sin complicación} en las Tablas~\ref{tab:radiomica_hemorragia}, \ref{tab:radiomica_neumotorax} y \ref{tab:radiomica_sin_complicacion_derivada}, respectivamente. Se han mantenido los códigos R01-R27 definidos en la Tabla~\ref{tab:top_modelos_radiomica}. Para cada resultado se han presentado la precisión, la sensibilidad, la puntuación F1 y la especificidad como media y desviación estándar entre los cinco folds.
+
+% El rendimiento se ha desglosado para hemorragia, neumotórax y el estado \textit{sin complicación} en las Tablas~\ref{tab:radiomica_hemorragia}, \ref{tab:radiomica_neumotorax} y \ref{tab:radiomica_sin_complicacion_derivada}, respectivamente. Se han mantenido las mismas configuraciones de la Tabla~\ref{tab:top_modelos_radiomica}, identificadas mediante un código común. Para cada resultado se han presentado la precisión, la sensibilidad, la puntuación F1 y la especificidad como media y desviación estándar entre los cinco folds. El estado \textit{sin complicación} se ha definido mediante la ausencia simultánea de hemorragia y neumotórax.
+
+% % Tablas auditadas: 27 configuraciones unicas; excluidas filas duplicadas 8, 12 y 22.
+% \begin{landscape}
+% \begingroup
+% \scriptsize
+% \setlength{\tabcolsep}{3pt}
+% \begin{longtable}{rllcccc}
+% \caption{Resultados por clase para hemorragia en las 27 configuraciones seleccionadas en el Cuadro~\ref{tab:top_modelos_radiomica}. Los valores se expresan como media $\pm$ desviación estándar entre los cinco folds.}\label{tab:radiomica_hemorragia}\\
+% \toprule
+% ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+% \midrule
+% \endfirsthead
+% \multicolumn{7}{c}{\tablename\ \thetable{} (continuación)} \\
+% \toprule
+% ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+% \midrule
+% \endhead
+% \midrule
+% \multicolumn{7}{r}{Continúa en la página siguiente} \\
+% \endfoot
+% \bottomrule
+% \endlastfoot
+% R01 & XGBoost & -- & 0.6000 $\pm$ 0.2528 & 0.2356 $\pm$ 0.0901 & 0.3313 $\pm$ 0.1159 & 0.9496 $\pm$ 0.0358 \\
+% R02 & ExtraTrees & -- & 0.7190 $\pm$ 0.2706 & 0.2822 $\pm$ 0.0564 & 0.3955 $\pm$ 0.0826 & 0.9533 $\pm$ 0.0558 \\
+% R03 & ExtraTrees & -- & 0.6967 $\pm$ 0.2451 & 0.3244 $\pm$ 0.1797 & 0.4326 $\pm$ 0.2124 & 0.9621 $\pm$ 0.0341 \\
+% R04 & ExtraTrees & -- & 0.7524 $\pm$ 0.2461 & 0.2578 $\pm$ 0.1118 & 0.3626 $\pm$ 0.1341 & 0.9600 $\pm$ 0.0548 \\
+% R05 & ExtraTrees & -- & 0.7524 $\pm$ 0.2461 & 0.2578 $\pm$ 0.1118 & 0.3626 $\pm$ 0.1341 & 0.9600 $\pm$ 0.0548 \\
+% R06 & XGBoost & -- & 0.6133 $\pm$ 0.3540 & 0.2133 $\pm$ 0.1064 & 0.3136 $\pm$ 0.1616 & 0.9558 $\pm$ 0.0422 \\
+% R07 & GradientBoosting & \texttt{clin\_full} & 0.6666 $\pm$ 0.1940 & 0.4867 $\pm$ 0.1867 & 0.5411 $\pm$ 0.1234 & 0.9175 $\pm$ 0.0478 \\
+% R08 & XGBoost & -- & 0.6133 $\pm$ 0.3540 & 0.2133 $\pm$ 0.1064 & 0.3136 $\pm$ 0.1616 & 0.9558 $\pm$ 0.0422 \\
+% R09 & XGBoost & -- & 0.6133 $\pm$ 0.3540 & 0.2133 $\pm$ 0.1064 & 0.3136 $\pm$ 0.1616 & 0.9558 $\pm$ 0.0422 \\
+% R10 & GradientBoosting & \texttt{clin\_sd} & 0.6044 $\pm$ 0.1288 & 0.4422 $\pm$ 0.1689 & 0.4965 $\pm$ 0.1381 & 0.9111 $\pm$ 0.0410 \\
+% R11 & LightGBM & -- & 0.4810 $\pm$ 0.1016 & 0.2653 $\pm$ 0.1332 & 0.3273 $\pm$ 0.1201 & 0.9156 $\pm$ 0.0384 \\
+% R12 & XGBoost & -- & 0.6667 $\pm$ 0.4714 & 0.1711 $\pm$ 0.1170 & 0.2711 $\pm$ 0.1856 & 0.9875 $\pm$ 0.0280 \\
+% R13 & XGBoost & -- & 0.6000 $\pm$ 0.2528 & 0.2356 $\pm$ 0.0901 & 0.3313 $\pm$ 0.1159 & 0.9496 $\pm$ 0.0358 \\
+% R14 & XGBoost & -- & 0.6000 $\pm$ 0.2528 & 0.2356 $\pm$ 0.0901 & 0.3313 $\pm$ 0.1159 & 0.9496 $\pm$ 0.0358 \\
+% R15 & ExtraTrees & -- & 0.6633 $\pm$ 0.2329 & 0.3022 $\pm$ 0.1481 & 0.4059 $\pm$ 0.1819 & 0.9558 $\pm$ 0.0355 \\
+% R16 & ExtraTrees & -- & 0.7133 $\pm$ 0.2785 & 0.3022 $\pm$ 0.1481 & 0.4125 $\pm$ 0.1835 & 0.9623 $\pm$ 0.0407 \\
+% R17 & ExtraTrees & -- & 0.6990 $\pm$ 0.2936 & 0.2822 $\pm$ 0.0564 & 0.3911 $\pm$ 0.0888 & 0.9467 $\pm$ 0.0606 \\
+% R18 & ExtraTrees & -- & 0.6729 $\pm$ 0.2340 & 0.3244 $\pm$ 0.1797 & 0.4243 $\pm$ 0.2015 & 0.9558 $\pm$ 0.0355 \\
+% R19 & XGBoost & \texttt{clin\_sd\_geom} & 0.6633 $\pm$ 0.1516 & 0.2711 $\pm$ 0.0570 & 0.3824 $\pm$ 0.0798 & 0.9556 $\pm$ 0.0276 \\
+% R20 & ExtraTrees & -- & 0.7524 $\pm$ 0.2461 & 0.2178 $\pm$ 0.0792 & 0.3150 $\pm$ 0.0668 & 0.9600 $\pm$ 0.0548 \\
+% R21 & XGBoost & -- & 0.6667 $\pm$ 0.4714 & 0.1711 $\pm$ 0.1170 & 0.2711 $\pm$ 0.1856 & 0.9875 $\pm$ 0.0280 \\
+% R22 & XGBoost & -- & 0.6667 $\pm$ 0.4714 & 0.1711 $\pm$ 0.1170 & 0.2711 $\pm$ 0.1856 & 0.9875 $\pm$ 0.0280 \\
+% R23 & LightGBM & -- & 0.4983 $\pm$ 0.2213 & 0.3022 $\pm$ 0.1256 & 0.3696 $\pm$ 0.1477 & 0.9052 $\pm$ 0.0498 \\
+% R24 & LightGBM & -- & 0.4983 $\pm$ 0.2213 & 0.3022 $\pm$ 0.1256 & 0.3696 $\pm$ 0.1477 & 0.9052 $\pm$ 0.0498 \\
+% R25 & LightGBM & \texttt{clin\_sd\_geom} & 0.5433 $\pm$ 0.4095 & 0.2144 $\pm$ 0.2217 & 0.2797 $\pm$ 0.2386 & 0.9545 $\pm$ 0.0371 \\
+% R26 & XGBoost & \texttt{clin\_sd} & 0.6833 $\pm$ 0.2075 & 0.2711 $\pm$ 0.0570 & 0.3838 $\pm$ 0.0824 & 0.9552 $\pm$ 0.0365 \\
+% R27 & XGBoost & -- & 0.6667 $\pm$ 0.4714 & 0.1711 $\pm$ 0.1170 & 0.2711 $\pm$ 0.1856 & 0.9875 $\pm$ 0.0280 \\
+% \end{longtable}
+% \endgroup
+% \end{landscape}
+
+% \begin{landscape}
+% \begingroup
+% \scriptsize
+% \setlength{\tabcolsep}{3pt}
+% \begin{longtable}{rllcccc}
+% \caption{Resultados por clase para neumotórax en las 27 configuraciones seleccionadas en el Cuadro~\ref{tab:top_modelos_radiomica}. Los valores se expresan como media $\pm$ desviación estándar entre los cinco folds.}\label{tab:radiomica_neumotorax}\\
+% \toprule
+% ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+% \midrule
+% \endfirsthead
+% \multicolumn{7}{c}{\tablename\ \thetable{} (continuación)} \\
+% \toprule
+% ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+% \midrule
+% \endhead
+% \midrule
+% \multicolumn{7}{r}{Continúa en la página siguiente} \\
+% \endfoot
+% \bottomrule
+% \endlastfoot
+% R01 & XGBoost & -- & 0.7298 $\pm$ 0.2343 & 0.4179 $\pm$ 0.1875 & 0.5061 $\pm$ 0.1670 & 0.9155 $\pm$ 0.0733 \\
+% R02 & ExtraTrees & -- & 0.6352 $\pm$ 0.2441 & 0.3936 $\pm$ 0.1601 & 0.4820 $\pm$ 0.1922 & 0.8946 $\pm$ 0.0835 \\
+% R03 & ExtraTrees & -- & 0.6295 $\pm$ 0.2499 & 0.3372 $\pm$ 0.1306 & 0.4268 $\pm$ 0.1367 & 0.9015 $\pm$ 0.0634 \\
+% R04 & ExtraTrees & -- & 0.6104 $\pm$ 0.1678 & 0.4269 $\pm$ 0.1255 & 0.4995 $\pm$ 0.1418 & 0.8724 $\pm$ 0.0704 \\
+% R05 & ExtraTrees & -- & 0.6104 $\pm$ 0.1678 & 0.4269 $\pm$ 0.1255 & 0.4995 $\pm$ 0.1418 & 0.8724 $\pm$ 0.0704 \\
+% R06 & XGBoost & -- & 0.7121 $\pm$ 0.2553 & 0.4038 $\pm$ 0.2203 & 0.4915 $\pm$ 0.2109 & 0.9224 $\pm$ 0.0585 \\
+% R07 & GradientBoosting & \texttt{clin\_full} & 0.5349 $\pm$ 0.1161 & 0.3974 $\pm$ 0.1125 & 0.4523 $\pm$ 0.1093 & 0.8443 $\pm$ 0.0613 \\
+% R08 & XGBoost & -- & 0.6982 $\pm$ 0.2630 & 0.4038 $\pm$ 0.2203 & 0.4871 $\pm$ 0.2115 & 0.9153 $\pm$ 0.0648 \\
+% R09 & XGBoost & -- & 0.6982 $\pm$ 0.2630 & 0.4038 $\pm$ 0.2203 & 0.4871 $\pm$ 0.2115 & 0.9153 $\pm$ 0.0648 \\
+% R10 & GradientBoosting & \texttt{clin\_sd} & 0.5668 $\pm$ 0.1612 & 0.3962 $\pm$ 0.0720 & 0.4568 $\pm$ 0.0702 & 0.8438 $\pm$ 0.0870 \\
+% R11 & LightGBM & -- & 0.5807 $\pm$ 0.1112 & 0.4861 $\pm$ 0.2219 & 0.5030 $\pm$ 0.1264 & 0.8486 $\pm$ 0.0712 \\
+% R12 & XGBoost & -- & 0.7281 $\pm$ 0.2877 & 0.3397 $\pm$ 0.2183 & 0.4357 $\pm$ 0.2327 & 0.9438 $\pm$ 0.0471 \\
+% R13 & XGBoost & -- & 0.6631 $\pm$ 0.1790 & 0.4026 $\pm$ 0.2086 & 0.4811 $\pm$ 0.1980 & 0.9084 $\pm$ 0.0642 \\
+% R14 & XGBoost & -- & 0.6631 $\pm$ 0.1790 & 0.4026 $\pm$ 0.2086 & 0.4811 $\pm$ 0.1980 & 0.9084 $\pm$ 0.0642 \\
+% R15 & ExtraTrees & -- & 0.6410 $\pm$ 0.2015 & 0.3372 $\pm$ 0.1306 & 0.4364 $\pm$ 0.1456 & 0.9153 $\pm$ 0.0479 \\
+% R16 & ExtraTrees & -- & 0.6276 $\pm$ 0.2016 & 0.3372 $\pm$ 0.1306 & 0.4312 $\pm$ 0.1400 & 0.9084 $\pm$ 0.0534 \\
+% R17 & ExtraTrees & -- & 0.6219 $\pm$ 0.2613 & 0.3936 $\pm$ 0.1601 & 0.4794 $\pm$ 0.1964 & 0.8872 $\pm$ 0.0857 \\
+% R18 & ExtraTrees & -- & 0.5498 $\pm$ 0.1517 & 0.3372 $\pm$ 0.1306 & 0.4133 $\pm$ 0.1330 & 0.8803 $\pm$ 0.0405 \\
+% R19 & XGBoost & \texttt{clin\_sd\_geom} & 0.5984 $\pm$ 0.1576 & 0.3679 $\pm$ 0.1626 & 0.4475 $\pm$ 0.1708 & 0.8938 $\pm$ 0.0569 \\
+% R20 & ExtraTrees & -- & 0.5992 $\pm$ 0.1741 & 0.4269 $\pm$ 0.1255 & 0.4952 $\pm$ 0.1430 & 0.8650 $\pm$ 0.0749 \\
+% R21 & XGBoost & -- & 0.7281 $\pm$ 0.2877 & 0.3244 $\pm$ 0.2366 & 0.4110 $\pm$ 0.2601 & 0.9438 $\pm$ 0.0471 \\
+% R22 & XGBoost & -- & 0.7281 $\pm$ 0.2877 & 0.3244 $\pm$ 0.2366 & 0.4110 $\pm$ 0.2601 & 0.9438 $\pm$ 0.0471 \\
+% R23 & LightGBM & -- & 0.5871 $\pm$ 0.2044 & 0.3692 $\pm$ 0.1645 & 0.4450 $\pm$ 0.1764 & 0.8874 $\pm$ 0.0664 \\
+% R24 & LightGBM & -- & 0.5871 $\pm$ 0.2044 & 0.3692 $\pm$ 0.1645 & 0.4450 $\pm$ 0.1764 & 0.8874 $\pm$ 0.0664 \\
+% R25 & LightGBM & \texttt{clin\_sd\_geom} & 0.5614 $\pm$ 0.1669 & 0.4881 $\pm$ 0.2079 & 0.5058 $\pm$ 0.1685 & 0.8404 $\pm$ 0.0791 \\
+% R26 & XGBoost & \texttt{clin\_sd} & 0.6269 $\pm$ 0.1643 & 0.3846 $\pm$ 0.1625 & 0.4685 $\pm$ 0.1732 & 0.9007 $\pm$ 0.0593 \\
+% R27 & XGBoost & -- & 0.7562 $\pm$ 0.2236 & 0.2897 $\pm$ 0.1620 & 0.3947 $\pm$ 0.1960 & 0.9507 $\pm$ 0.0405 \\
+% \end{longtable}
+% \endgroup
+% \end{landscape}
+
+% \begin{landscape}
+% \begingroup
+% \scriptsize
+% \setlength{\tabcolsep}{3pt}
+% \begin{longtable}{rllcccc}
+% \caption{Resultados correspondientes al estado \emph{sin complicación} en las configuraciones seleccionadas en la Tabla~\ref{tab:top_modelos_radiomica}. Los valores se expresan como media $\pm$ desviación estándar entre los cinco folds.}
+% \label{tab:radiomica_sin_complicacion_derivada}\\
+% \toprule
+% ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+% \midrule
+% \endfirsthead
+% \multicolumn{7}{c}{\tablename\ \thetable{} (continuación)} \\
+% \toprule
+% ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+% \midrule
+% \endhead
+% \midrule
+% \multicolumn{7}{r}{Continúa en la página siguiente} \\
+% \endfoot
+% \bottomrule
+% \endlastfoot
+% R01 & XGBoost & -- & 0.6317 $\pm$ 0.0682 & 0.9033 $\pm$ 0.0362 & 0.7417 $\pm$ 0.0492 & 0.4462 $\pm$ 0.1518 \\
+% R02 & ExtraTrees & -- & 0.6381 $\pm$ 0.0481 & 0.8853 $\pm$ 0.0943 & 0.7401 $\pm$ 0.0573 & 0.4989 $\pm$ 0.1120 \\
+% R03 & ExtraTrees & -- & 0.6364 $\pm$ 0.0685 & 0.8938 $\pm$ 0.0416 & 0.7422 $\pm$ 0.0557 & 0.4667 $\pm$ 0.1296 \\
+% R04 & ExtraTrees & -- & 0.6394 $\pm$ 0.0489 & 0.8747 $\pm$ 0.0959 & 0.7375 $\pm$ 0.0603 & 0.5095 $\pm$ 0.0976 \\
+% R05 & ExtraTrees & -- & 0.6394 $\pm$ 0.0489 & 0.8747 $\pm$ 0.0959 & 0.7375 $\pm$ 0.0603 & 0.5095 $\pm$ 0.0976 \\
+% R06 & XGBoost & -- & 0.6194 $\pm$ 0.0588 & 0.9129 $\pm$ 0.0638 & 0.7367 $\pm$ 0.0527 & 0.4171 $\pm$ 0.1189 \\
+% R07 & GradientBoosting & \texttt{clin\_full} & 0.6550 $\pm$ 0.0747 & 0.8057 $\pm$ 0.0357 & 0.7200 $\pm$ 0.0426 & 0.5600 $\pm$ 0.1372 \\
+% R08 & XGBoost & -- & 0.6194 $\pm$ 0.0588 & 0.9129 $\pm$ 0.0638 & 0.7367 $\pm$ 0.0527 & 0.4171 $\pm$ 0.1189 \\
+% R09 & XGBoost & -- & 0.6194 $\pm$ 0.0588 & 0.9129 $\pm$ 0.0638 & 0.7367 $\pm$ 0.0527 & 0.4171 $\pm$ 0.1189 \\
+% R10 & GradientBoosting & \texttt{clin\_sd} & 0.6615 $\pm$ 0.1057 & 0.8238 $\pm$ 0.0785 & 0.7312 $\pm$ 0.0835 & 0.5590 $\pm$ 0.1699 \\
+% R11 & LightGBM & -- & 0.6631 $\pm$ 0.1086 & 0.8478 $\pm$ 0.0789 & 0.7415 $\pm$ 0.0872 & 0.5725 $\pm$ 0.0992 \\
+% R12 & XGBoost & -- & 0.6001 $\pm$ 0.0349 & 0.9614 $\pm$ 0.0400 & 0.7382 $\pm$ 0.0286 & 0.3371 $\pm$ 0.0912 \\
+% R13 & XGBoost & -- & 0.6260 $\pm$ 0.0753 & 0.8938 $\pm$ 0.0245 & 0.7345 $\pm$ 0.0562 & 0.4362 $\pm$ 0.1687 \\
+% R14 & XGBoost & -- & 0.6260 $\pm$ 0.0753 & 0.8938 $\pm$ 0.0245 & 0.7345 $\pm$ 0.0562 & 0.4362 $\pm$ 0.1687 \\
+% R15 & ExtraTrees & -- & 0.6277 $\pm$ 0.0636 & 0.8838 $\pm$ 0.0577 & 0.7334 $\pm$ 0.0600 & 0.4567 $\pm$ 0.1071 \\
+% R16 & ExtraTrees & -- & 0.6282 $\pm$ 0.0564 & 0.8843 $\pm$ 0.0553 & 0.7334 $\pm$ 0.0499 & 0.4567 $\pm$ 0.1071 \\
+% R17 & ExtraTrees & -- & 0.6308 $\pm$ 0.0540 & 0.8753 $\pm$ 0.0950 & 0.7318 $\pm$ 0.0623 & 0.4889 $\pm$ 0.1141 \\
+% R18 & ExtraTrees & -- & 0.6382 $\pm$ 0.0648 & 0.8843 $\pm$ 0.0282 & 0.7402 $\pm$ 0.0498 & 0.4767 $\pm$ 0.1251 \\
+% R19 & XGBoost & \texttt{clin\_sd\_geom} & 0.6118 $\pm$ 0.0471 & 0.9133 $\pm$ 0.0708 & 0.7316 $\pm$ 0.0458 & 0.4129 $\pm$ 0.0887 \\
+% R20 & ExtraTrees & -- & 0.6394 $\pm$ 0.0489 & 0.8747 $\pm$ 0.0959 & 0.7375 $\pm$ 0.0603 & 0.5095 $\pm$ 0.0976 \\
+% R21 & XGBoost & -- & 0.5971 $\pm$ 0.0388 & 0.9614 $\pm$ 0.0400 & 0.7358 $\pm$ 0.0306 & 0.3271 $\pm$ 0.1107 \\
+% R22 & XGBoost & -- & 0.5971 $\pm$ 0.0388 & 0.9614 $\pm$ 0.0400 & 0.7358 $\pm$ 0.0306 & 0.3271 $\pm$ 0.1107 \\
+% R23 & LightGBM & -- & 0.6512 $\pm$ 0.0563 & 0.8848 $\pm$ 0.0719 & 0.7480 $\pm$ 0.0476 & 0.5067 $\pm$ 0.1146 \\
+% R24 & LightGBM & -- & 0.6512 $\pm$ 0.0563 & 0.8848 $\pm$ 0.0719 & 0.7480 $\pm$ 0.0476 & 0.5067 $\pm$ 0.1146 \\
+% R25 & LightGBM & \texttt{clin\_sd\_geom} & 0.6321 $\pm$ 0.1078 & 0.8420 $\pm$ 0.1277 & 0.7207 $\pm$ 0.1103 & 0.5197 $\pm$ 0.0391 \\
+% R26 & XGBoost & \texttt{clin\_sd} & 0.6021 $\pm$ 0.0397 & 0.8933 $\pm$ 0.0518 & 0.7187 $\pm$ 0.0380 & 0.4029 $\pm$ 0.0703 \\
+% R27 & XGBoost & -- & 0.5956 $\pm$ 0.0347 & 0.9710 $\pm$ 0.0265 & 0.7377 $\pm$ 0.0278 & 0.3167 $\pm$ 0.1027 \\
+% \end{longtable}
+% \endgroup
+% \end{landscape}
+
+
+% El análisis por resultado ha mostrado diferencias respecto a la ordenación global. El mayor F1 medio para hemorragia se ha obtenido con la configuración R07 basada en \textit{GradientBoosting} ($0.5411 \pm 0.1234$), mientras que para neumotórax el mejor valor ha correspondido a la configuración R01 basada en \textit{XGBoost} ($0.5061 \pm 0.1670$). Para el estado \textit{sin complicación}, el valor más alto registrado se ha observado en la configuración R23 basada en \textit{LightGBM} ($0.7480 \pm 0.0476$).
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+
+\begin{longtable}{rllcccc}
+\caption{Resultados por clase para hemorragia en las mejores configuraciones seleccionadas en la Tabla~\ref{tab:top_modelos_radiomica}. Los valores se expresan como media $\pm$ desviación estándar entre los cinco folds.}
+\label{tab:radiomica_hemorragia}\\
+\toprule
+ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+\midrule
+\endfirsthead
+
+\multicolumn{7}{c}{\tablename\ \thetable{} (continuación)} \\
+\toprule
+ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{7}{r}{Continúa en la página siguiente} \\
+\endfoot
+\bottomrule
+\endlastfoot
+R01 & XGBoost & -- & 0.6300 $\pm$ 0.3493 & 0.2333 $\pm$ 0.0875 & 0.3374 $\pm$ 0.1422 & 0.9496 $\pm$ 0.0475 \\
+R02 & ExtraTrees & -- & 0.7190 $\pm$ 0.2706 & 0.2822 $\pm$ 0.0564 & 0.3955 $\pm$ 0.0826 & 0.9533 $\pm$ 0.0558 \\
+R03 & ExtraTrees & -- & 0.6967 $\pm$ 0.2451 & 0.3244 $\pm$ 0.1797 & 0.4326 $\pm$ 0.2124 & 0.9621 $\pm$ 0.0341 \\
+R04 & ExtraTrees & -- & 0.7524 $\pm$ 0.2461 & 0.2578 $\pm$ 0.1118 & 0.3626 $\pm$ 0.1341 & 0.9600 $\pm$ 0.0548 \\
+R05 & ExtraTrees & -- & 0.7524 $\pm$ 0.2461 & 0.2578 $\pm$ 0.1118 & 0.3626 $\pm$ 0.1341 & 0.9600 $\pm$ 0.0548 \\
+R06 & XGBoost & -- & 0.6133 $\pm$ 0.3540 & 0.2133 $\pm$ 0.1064 & 0.3136 $\pm$ 0.1616 & 0.9558 $\pm$ 0.0422 \\
+R07 & GradientBoosting & \texttt{clin\_full} & 0.6666 $\pm$ 0.1940 & 0.4867 $\pm$ 0.1867 & 0.5411 $\pm$ 0.1234 & 0.9175 $\pm$ 0.0478 \\
+R08 & XGBoost & -- & 0.6467 $\pm$ 0.3280 & 0.2333 $\pm$ 0.0875 & 0.3399 $\pm$ 0.1381 & 0.9558 $\pm$ 0.0422 \\
+R09 & XGBoost & -- & 0.6133 $\pm$ 0.3540 & 0.2133 $\pm$ 0.1064 & 0.3136 $\pm$ 0.1616 & 0.9558 $\pm$ 0.0422 \\
+R10 & GradientBoosting & \texttt{clin\_sd} & 0.6044 $\pm$ 0.1288 & 0.4422 $\pm$ 0.1689 & 0.4965 $\pm$ 0.1381 & 0.9111 $\pm$ 0.0410 \\
+R11 & LightGBM & -- & 0.4810 $\pm$ 0.1016 & 0.2653 $\pm$ 0.1332 & 0.3273 $\pm$ 0.1201 & 0.9156 $\pm$ 0.0384 \\
+R12 & XGBoost & -- & 0.6000 $\pm$ 0.4346 & 0.1711 $\pm$ 0.1170 & 0.2650 $\pm$ 0.1823 & 0.9812 $\pm$ 0.0280 \\
+R13 & XGBoost & -- & 0.6300 $\pm$ 0.3493 & 0.2333 $\pm$ 0.0875 & 0.3374 $\pm$ 0.1422 & 0.9496 $\pm$ 0.0475 \\
+R14 & XGBoost & -- & 0.5967 $\pm$ 0.3720 & 0.2133 $\pm$ 0.1064 & 0.3110 $\pm$ 0.1646 & 0.9496 $\pm$ 0.0475 \\
+R15 & ExtraTrees & -- & 0.6633 $\pm$ 0.2329 & 0.3022 $\pm$ 0.1481 & 0.4059 $\pm$ 0.1819 & 0.9558 $\pm$ 0.0355 \\
+R16 & ExtraTrees & -- & 0.7133 $\pm$ 0.2785 & 0.3022 $\pm$ 0.1481 & 0.4125 $\pm$ 0.1835 & 0.9623 $\pm$ 0.0407 \\
+R17 & ExtraTrees & -- & 0.6990 $\pm$ 0.2936 & 0.2822 $\pm$ 0.0564 & 0.3911 $\pm$ 0.0888 & 0.9467 $\pm$ 0.0606 \\
+R18 & ExtraTrees & -- & 0.6729 $\pm$ 0.2340 & 0.3244 $\pm$ 0.1797 & 0.4243 $\pm$ 0.2015 & 0.9558 $\pm$ 0.0355 \\
+R19 & XGBoost & \texttt{clin\_sd\_geom} & 0.6633 $\pm$ 0.1516 & 0.2711 $\pm$ 0.0570 & 0.3824 $\pm$ 0.0798 & 0.9556 $\pm$ 0.0276 \\
+R20 & ExtraTrees & -- & 0.7524 $\pm$ 0.2461 & 0.2178 $\pm$ 0.0792 & 0.3150 $\pm$ 0.0668 & 0.9600 $\pm$ 0.0548 \\
+R21 & XGBoost & -- & 0.6000 $\pm$ 0.4346 & 0.1711 $\pm$ 0.1170 & 0.2650 $\pm$ 0.1823 & 0.9812 $\pm$ 0.0280 \\
+R22 & XGBoost & -- & 0.6000 $\pm$ 0.4346 & 0.1711 $\pm$ 0.1170 & 0.2650 $\pm$ 0.1823 & 0.9812 $\pm$ 0.0280 \\
+R23 & LightGBM & -- & 0.5305 $\pm$ 0.2056 & 0.3200 $\pm$ 0.1073 & 0.3967 $\pm$ 0.1376 & 0.9117 $\pm$ 0.0462 \\
+R24 & LightGBM & -- & 0.5305 $\pm$ 0.2056 & 0.3200 $\pm$ 0.1073 & 0.3967 $\pm$ 0.1376 & 0.9117 $\pm$ 0.0462 \\
+R25 & LightGBM & \texttt{clin\_sd\_geom} & 0.5433 $\pm$ 0.4095 & 0.2144 $\pm$ 0.2217 & 0.2797 $\pm$ 0.2386 & 0.9545 $\pm$ 0.0371 \\
+R26 & XGBoost & \texttt{clin\_sd} & 0.6833 $\pm$ 0.2075 & 0.2711 $\pm$ 0.0570 & 0.3838 $\pm$ 0.0824 & 0.9552 $\pm$ 0.0365 \\
+R27 & XGBoost & -- & 0.5667 $\pm$ 0.4346 & 0.1711 $\pm$ 0.1170 & 0.2599 $\pm$ 0.1802 & 0.9750 $\pm$ 0.0342 \\
+\end{longtable}
+\endgroup
+\end{landscape}
+
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+
+\begin{longtable}{rllcccc}
+\caption{Resultados por clase para neumotórax en las mejores configuraciones seleccionadas en la Tabla~\ref{tab:top_modelos_radiomica}. Los valores se expresan como media $\pm$ desviación estándar entre los cinco folds.}
+\label{tab:radiomica_neumotorax}\\
+\toprule
+ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+\midrule
+\endfirsthead
+
+\multicolumn{7}{c}{\tablename\ \thetable{} (continuación)} \\
+\toprule
+ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{7}{r}{Continúa en la página siguiente} \\
+\endfoot
+\bottomrule
+\endlastfoot
+R01 & XGBoost & -- & 0.7195 $\pm$ 0.2388 & 0.4179 $\pm$ 0.1875 & 0.5007 $\pm$ 0.1609 & 0.9086 $\pm$ 0.0809 \\
+R02 & ExtraTrees & -- & 0.6352 $\pm$ 0.2441 & 0.3936 $\pm$ 0.1601 & 0.4820 $\pm$ 0.1922 & 0.8946 $\pm$ 0.0835 \\
+R03 & ExtraTrees & -- & 0.6295 $\pm$ 0.2499 & 0.3372 $\pm$ 0.1306 & 0.4268 $\pm$ 0.1367 & 0.9015 $\pm$ 0.0634 \\
+R04 & ExtraTrees & -- & 0.6104 $\pm$ 0.1678 & 0.4269 $\pm$ 0.1255 & 0.4995 $\pm$ 0.1418 & 0.8724 $\pm$ 0.0704 \\
+R05 & ExtraTrees & -- & 0.6104 $\pm$ 0.1678 & 0.4269 $\pm$ 0.1255 & 0.4995 $\pm$ 0.1418 & 0.8724 $\pm$ 0.0704 \\
+R06 & XGBoost & -- & 0.7231 $\pm$ 0.2560 & 0.3718 $\pm$ 0.2228 & 0.4624 $\pm$ 0.2240 & 0.9293 $\pm$ 0.0567 \\
+R07 & GradientBoosting & \texttt{clin\_full} & 0.5349 $\pm$ 0.1161 & 0.3974 $\pm$ 0.1125 & 0.4523 $\pm$ 0.1093 & 0.8443 $\pm$ 0.0613 \\
+R08 & XGBoost & -- & 0.7410 $\pm$ 0.2505 & 0.3718 $\pm$ 0.2228 & 0.4672 $\pm$ 0.2246 & 0.9365 $\pm$ 0.0531 \\
+R09 & XGBoost & -- & 0.7410 $\pm$ 0.2505 & 0.3872 $\pm$ 0.2060 & 0.4889 $\pm$ 0.2048 & 0.9365 $\pm$ 0.0531 \\
+R10 & GradientBoosting & \texttt{clin\_sd} & 0.5668 $\pm$ 0.1612 & 0.3962 $\pm$ 0.0720 & 0.4568 $\pm$ 0.0702 & 0.8438 $\pm$ 0.0870 \\
+R11 & LightGBM & -- & 0.5807 $\pm$ 0.1112 & 0.4861 $\pm$ 0.2219 & 0.5030 $\pm$ 0.1264 & 0.8486 $\pm$ 0.0712 \\
+R12 & XGBoost & -- & 0.7614 $\pm$ 0.3116 & 0.3385 $\pm$ 0.2143 & 0.4418 $\pm$ 0.2346 & 0.9507 $\pm$ 0.0532 \\
+R13 & XGBoost & -- & 0.6528 $\pm$ 0.1803 & 0.4026 $\pm$ 0.2086 & 0.4757 $\pm$ 0.1920 & 0.9015 $\pm$ 0.0718 \\
+R14 & XGBoost & -- & 0.6528 $\pm$ 0.1803 & 0.4026 $\pm$ 0.2086 & 0.4757 $\pm$ 0.1920 & 0.9015 $\pm$ 0.0718 \\
+R15 & ExtraTrees & -- & 0.6410 $\pm$ 0.2015 & 0.3372 $\pm$ 0.1306 & 0.4364 $\pm$ 0.1456 & 0.9153 $\pm$ 0.0479 \\
+R16 & ExtraTrees & -- & 0.6276 $\pm$ 0.2016 & 0.3372 $\pm$ 0.1306 & 0.4312 $\pm$ 0.1400 & 0.9084 $\pm$ 0.0534 \\
+R17 & ExtraTrees & -- & 0.6219 $\pm$ 0.2613 & 0.3936 $\pm$ 0.1601 & 0.4794 $\pm$ 0.1964 & 0.8872 $\pm$ 0.0857 \\
+R18 & ExtraTrees & -- & 0.5498 $\pm$ 0.1517 & 0.3372 $\pm$ 0.1306 & 0.4133 $\pm$ 0.1330 & 0.8803 $\pm$ 0.0405 \\
+R19 & XGBoost & \texttt{clin\_sd\_geom} & 0.5984 $\pm$ 0.1576 & 0.3679 $\pm$ 0.1626 & 0.4475 $\pm$ 0.1708 & 0.8938 $\pm$ 0.0569 \\
+R20 & ExtraTrees & -- & 0.5992 $\pm$ 0.1741 & 0.4269 $\pm$ 0.1255 & 0.4952 $\pm$ 0.1430 & 0.8650 $\pm$ 0.0749 \\
+R21 & XGBoost & -- & 0.7614 $\pm$ 0.3116 & 0.3385 $\pm$ 0.2143 & 0.4418 $\pm$ 0.2346 & 0.9507 $\pm$ 0.0532 \\
+R22 & XGBoost & -- & 0.7281 $\pm$ 0.2877 & 0.3385 $\pm$ 0.2143 & 0.4352 $\pm$ 0.2299 & 0.9438 $\pm$ 0.0471 \\
+R23 & LightGBM & -- & 0.5194 $\pm$ 0.1699 & 0.3397 $\pm$ 0.1893 & 0.3979 $\pm$ 0.1725 & 0.8663 $\pm$ 0.0623 \\
+R24 & LightGBM & -- & 0.5194 $\pm$ 0.1699 & 0.3397 $\pm$ 0.1893 & 0.3979 $\pm$ 0.1725 & 0.8663 $\pm$ 0.0623 \\
+R25 & LightGBM & \texttt{clin\_sd\_geom} & 0.5614 $\pm$ 0.1669 & 0.4881 $\pm$ 0.2079 & 0.5058 $\pm$ 0.1685 & 0.8404 $\pm$ 0.0791 \\
+R26 & XGBoost & \texttt{clin\_sd} & 0.6269 $\pm$ 0.1643 & 0.3846 $\pm$ 0.1625 & 0.4685 $\pm$ 0.1732 & 0.9007 $\pm$ 0.0593 \\
+R27 & XGBoost & -- & 0.7733 $\pm$ 0.2521 & 0.2577 $\pm$ 0.1387 & 0.3684 $\pm$ 0.1817 & 0.9576 $\pm$ 0.0462 \\
+\end{longtable}
+\endgroup
+\end{landscape}
+
+
+\begin{landscape}
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+
+\begin{longtable}{rllcccc}
+\caption{Resultados correspondientes al estado derivado \emph{sin complicación} en las mejores configuraciones seleccionadas en la Tabla~\ref{tab:top_modelos_radiomica}. Los valores se expresan como media $\pm$ desviación estándar entre los cinco folds.}
+\label{tab:radiomica_sin_complicacion_derivada}\\
+\toprule
+ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+\midrule
+\endfirsthead
+
+\multicolumn{7}{c}{\tablename\ \thetable{} (continuación)} \\
+\toprule
+ID & Modelo & Datos adicionales & Precisión & Sensibilidad & F1 & Especificidad \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{7}{r}{Continúa en la página siguiente} \\
+\endfoot
+\bottomrule
+\endlastfoot
+R01 & XGBoost & -- & 0.6290 $\pm$ 0.0464 & 0.9033 $\pm$ 0.0598 & 0.7401 $\pm$ 0.0357 & 0.4462 $\pm$ 0.1086 \\
+R02 & ExtraTrees & -- & 0.6379 $\pm$ 0.0517 & 0.9163 $\pm$ 0.0801 & 0.7505 $\pm$ 0.0514 & 0.4789 $\pm$ 0.1204 \\
+R03 & ExtraTrees & -- & 0.6281 $\pm$ 0.0577 & 0.9324 $\pm$ 0.0434 & 0.7497 $\pm$ 0.0512 & 0.4271 $\pm$ 0.1083 \\
+R04 & ExtraTrees & -- & 0.6380 $\pm$ 0.0374 & 0.9058 $\pm$ 0.0868 & 0.7475 $\pm$ 0.0471 & 0.4889 $\pm$ 0.0865 \\
+R05 & ExtraTrees & -- & 0.6380 $\pm$ 0.0374 & 0.9058 $\pm$ 0.0868 & 0.7475 $\pm$ 0.0471 & 0.4889 $\pm$ 0.0865 \\
+R06 & XGBoost & -- & 0.6007 $\pm$ 0.0450 & 0.9033 $\pm$ 0.0598 & 0.7202 $\pm$ 0.0375 & 0.3771 $\pm$ 0.1066 \\
+R07 & GradientBoosting & \texttt{clin\_full} & 0.6550 $\pm$ 0.0747 & 0.8057 $\pm$ 0.0357 & 0.7200 $\pm$ 0.0426 & 0.5600 $\pm$ 0.1372 \\
+R08 & XGBoost & -- & 0.6004 $\pm$ 0.0437 & 0.9033 $\pm$ 0.0598 & 0.7202 $\pm$ 0.0385 & 0.3771 $\pm$ 0.1006 \\
+R09 & XGBoost & -- & 0.5996 $\pm$ 0.0401 & 0.9033 $\pm$ 0.0598 & 0.7199 $\pm$ 0.0388 & 0.3771 $\pm$ 0.0798 \\
+R10 & GradientBoosting & \texttt{clin\_sd} & 0.6615 $\pm$ 0.1057 & 0.8238 $\pm$ 0.0785 & 0.7312 $\pm$ 0.0835 & 0.5590 $\pm$ 0.1699 \\
+R11 & LightGBM & -- & 0.6631 $\pm$ 0.1086 & 0.8478 $\pm$ 0.0789 & 0.7415 $\pm$ 0.0872 & 0.5725 $\pm$ 0.0992 \\
+R12 & XGBoost & -- & 0.6040 $\pm$ 0.0454 & 0.9614 $\pm$ 0.0400 & 0.7413 $\pm$ 0.0419 & 0.3471 $\pm$ 0.1020 \\
+R13 & XGBoost & -- & 0.6233 $\pm$ 0.0523 & 0.8938 $\pm$ 0.0416 & 0.7330 $\pm$ 0.0367 & 0.4362 $\pm$ 0.1263 \\
+R14 & XGBoost & -- & 0.6192 $\pm$ 0.0521 & 0.8938 $\pm$ 0.0416 & 0.7301 $\pm$ 0.0361 & 0.4262 $\pm$ 0.1269 \\
+R15 & ExtraTrees & -- & 0.6229 $\pm$ 0.0585 & 0.9319 $\pm$ 0.0568 & 0.7463 $\pm$ 0.0587 & 0.4171 $\pm$ 0.0956 \\
+R16 & ExtraTrees & -- & 0.6233 $\pm$ 0.0529 & 0.9324 $\pm$ 0.0550 & 0.7464 $\pm$ 0.0511 & 0.4171 $\pm$ 0.0956 \\
+R17 & ExtraTrees & -- & 0.6352 $\pm$ 0.0547 & 0.9063 $\pm$ 0.0779 & 0.7456 $\pm$ 0.0549 & 0.4789 $\pm$ 0.1204 \\
+R18 & ExtraTrees & -- & 0.6327 $\pm$ 0.0611 & 0.9324 $\pm$ 0.0434 & 0.7528 $\pm$ 0.0528 & 0.4371 $\pm$ 0.1185 \\
+R19 & XGBoost & \texttt{clin\_sd\_geom} & 0.6118 $\pm$ 0.0471 & 0.9133 $\pm$ 0.0708 & 0.7316 $\pm$ 0.0458 & 0.4129 $\pm$ 0.0887 \\
+R20 & ExtraTrees & -- & 0.6380 $\pm$ 0.0374 & 0.9058 $\pm$ 0.0868 & 0.7475 $\pm$ 0.0471 & 0.4889 $\pm$ 0.0865 \\
+R21 & XGBoost & -- & 0.6040 $\pm$ 0.0454 & 0.9614 $\pm$ 0.0400 & 0.7413 $\pm$ 0.0419 & 0.3471 $\pm$ 0.1020 \\
+R22 & XGBoost & -- & 0.6017 $\pm$ 0.0436 & 0.9519 $\pm$ 0.0337 & 0.7367 $\pm$ 0.0380 & 0.3471 $\pm$ 0.1020 \\
+R23 & LightGBM & -- & 0.6437 $\pm$ 0.0516 & 0.8752 $\pm$ 0.0537 & 0.7403 $\pm$ 0.0381 & 0.4957 $\pm$ 0.1031 \\
+R24 & LightGBM & -- & 0.6437 $\pm$ 0.0516 & 0.8752 $\pm$ 0.0537 & 0.7403 $\pm$ 0.0381 & 0.4957 $\pm$ 0.1031 \\
+R25 & LightGBM & \texttt{clin\_sd\_geom} & 0.6321 $\pm$ 0.1078 & 0.8420 $\pm$ 0.1277 & 0.7207 $\pm$ 0.1103 & 0.5197 $\pm$ 0.0391 \\
+R26 & XGBoost & \texttt{clin\_sd} & 0.6021 $\pm$ 0.0397 & 0.8933 $\pm$ 0.0518 & 0.7187 $\pm$ 0.0380 & 0.4029 $\pm$ 0.0703 \\
+R27 & XGBoost & -- & 0.5858 $\pm$ 0.0426 & 0.9614 $\pm$ 0.0400 & 0.7279 $\pm$ 0.0442 & 0.2967 $\pm$ 0.0982 \\
+\end{longtable}
+\endgroup
+\end{landscape}
+
+El análisis por clase ha mostrado diferencias relevantes entre los tres resultados. Para hemorragia, el mayor F1 se ha obtenido con R07, basada en \textit{GradientBoosting} y variables clínicas completas, con \(0.5411 \pm 0.1234\), mientras que para neumotórax el mejor valor ha correspondido a R25, basada en \textit{LightGBM} y variables clínicas y geométricas, con \(0.5058 \pm 0.1685\). En ambas complicaciones se han observado sensibilidades moderadas y especificidades elevadas, lo que indica que los modelos han identificado mejor los casos negativos que los pacientes que realmente han presentado la complicación. En cambio, el estado derivado \textit{sin complicación} ha alcanzado valores de F1 notablemente superiores, con un máximo de \(0.7528 \pm 0.0528\) en R18. Este mejor rendimiento debe interpretarse teniendo en cuenta que \textit{Sin\_complicación} presenta mayor soporte y se activa siempre que ambas complicaciones se predicen como ausentes. Por ello, su elevada sensibilidad, acompañada en varias configuraciones de una especificidad más reducida, refleja parcialmente la tendencia de los modelos a no detectar las complicaciones minoritarias y no el aprendizaje independiente de una tercera clase.

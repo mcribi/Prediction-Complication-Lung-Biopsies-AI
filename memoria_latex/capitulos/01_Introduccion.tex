@@ -1,0 +1,96 @@
+\chapter{Introducción}\label{chap:intro}
+
+Este capítulo presenta el contexto y la motivación del problema abordado, así como los precedentes sobre los que se apoya el trabajo. A continuación, se describen la propuesta, los objetivos, la planificación seguida y la estructura de la memoria.
+
+\section{Contexto y motivación}
+
+El cáncer de pulmón constituye uno de los principales problemas de salud pública a nivel mundial, tanto por su elevada incidencia como por su alta mortalidad. En 2022 se registraron aproximadamente 2,5 millones de nuevos casos de cáncer de pulmón, lo que lo situó como el tumor diagnosticado con mayor frecuencia, y cerca de 1,8 millones de fallecimientos, convirtiéndolo en la principal causa de muerte por cáncer a nivel global \cite{Bray2024}. En este contexto, la tomografía computarizada (TC) desempeña un papel esencial en la detección, caracterización y seguimiento de lesiones pulmonares sospechosas, así como en la planificación de procedimientos diagnósticos posteriores.
+
+Cuando una lesión pulmonar requiere confirmación histológica o molecular, la biopsia pulmonar guiada por TC constituye una técnica mínimamente invasiva ampliamente utilizada en la práctica clínica. Este procedimiento permite obtener muestras de tejido de forma dirigida y resulta especialmente relevante en lesiones periféricas. Sin embargo, aunque presenta un elevado rendimiento diagnóstico, no está exento de riesgos.  Entre las complicaciones más frecuentes se encuentran el neumotórax y la hemorragia pulmonar. Su incidencia varía en función de la técnica y del tipo de biopsia realizados \cite{Ho2023}, con tasas globales de complicación comprendidas aproximadamente entre el 24\% y el 39\% \cite{Heerink2017}. En la Figura~\ref{fig:intro_complicaciones_biopsia} se muestra un ejemplo de estas complicaciones tras la realización de una biopsia pulmonar guiada por TC.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{imagenes/introduccion/complicacion.png}
+    \caption{Ejemplo de neumotórax y hemorragia alveolar como complicaciones tras la realización de una biopsia pulmonar guiada por TC. Fuente: \cite{elshafee2019complications}.}
+    \label{fig:intro_complicaciones_biopsia}
+\end{figure}
+
+La aparición de estas complicaciones puede depender de múltiples factores relacionados con el paciente, la lesión y el propio procedimiento, como la presencia de enfisema, el tamaño y la profundidad del nódulo, el contacto con la pleura o el trayecto de la aguja. Por ello, disponer de herramientas capaces de estimar el riesgo antes de realizar la biopsia podría ayudar a identificar pacientes con mayor probabilidad de eventos adversos, apoyar la planificación de la intervención y favorecer una toma de decisiones más personalizada. Además, anticipar el tipo de complicación más probable podría contribuir a una mejor organización de los recursos clínicos necesarios durante el procedimiento, como la disponibilidad de material específico, medidas de monitorización adicionales o preparación transfusional en pacientes con mayor riesgo de hemorragia.
+
+En los últimos años, la inteligencia artificial ha mostrado un gran potencial en el análisis de datos clínicos e imagen médica. Sin embargo, gran parte de la investigación en TC torácica se ha centrado en tareas como la detección de nódulos, la caracterización tumoral o la predicción del riesgo de cáncer de pulmón. En comparación, la predicción preprocedimiento de complicaciones asociadas a la biopsia pulmonar ha recibido una atención mucho menor. Esta diferencia motiva el desarrollo de enfoques capaces de combinar información clínica e imagen médica para estudiar no solo si puede aparecer una complicación, sino también qué tipo de complicación es más probable.
+
+
+% \section{Precedentes}
+
+% Esta línea de investigación se inició en el Trabajo de Fin de Grado previo, centrado en la predicción binaria de complicaciones en biopsias pulmonares mediante inteligencia artificial. A partir de dicho trabajo se elaboró una publicación científica aceptada en la \textit{IEEE Conference on Artificial Intelligence 2026}, donde se expusieron resultados preliminares sobre el uso de variables clínicas, características radiómicas y modelos tridimensionales de aprendizaje profundo para este problema \cite{perez2026prediction}. Estos resultados mostraron que la aproximación era prometedora, especialmente en los enfoques basados en radiómica, pero también pusieron de manifiesto limitaciones importantes relacionadas con el tamaño muestral, la heterogeneidad de los datos y la capacidad de generalización de los modelos profundos.
+
+% El presente Trabajo de Fin de Máster surge como continuación natural de esa línea previa. Su motivación principal es avanzar desde un estudio preliminar con clasificación binaria hacia una formulación más completa y rigurosa del problema, incorporando una perspectiva multietiqueta, nuevos datos y técnicas avanzadas de inteligencia artificial adaptadas a las particularidades del contexto clínico, como el \textit{Positive-Unlabeled Learning} (PU learning) o el descubrimiento de subgrupos. El objetivo no es únicamente mejorar la capacidad predictiva, sino también contribuir a la caracterización de las complicaciones asociadas a las biopsias pulmonares, analizando qué información resulta más útil, qué patrones pueden identificarse en los datos, qué limitaciones metodológicas condicionan el aprendizaje en una cohorte clínica reducida y cómo obtener resultados robustos, trazables e interpretables en un contexto médico sensible.
+
+\section{Precedentes}
+
+La línea de investigación desarrollada en este Trabajo de Fin de Máster (TFM) se inició en el Trabajo de Fin de Grado (TFG) titulado \textit{Predicción de complicaciones en biopsias pulmonares con IA}. A partir de dicho trabajo se elaboró el artículo \textit{Prediction of Complications in Lung Biopsies with Artificial Intelligence: A Preliminary Study and Early Findings}, aceptado en la \textit{IEEE Conference on Artificial Intelligence 2026} \cite{perez2026prediction}. La publicación recogió los principales experimentos y conclusiones del TFG, constituyendo el antecedente directo del presente trabajo.
+
+El TFG se desarrolló a partir de una versión inicial de la misma base de datos utilizada en este TFM, obtenida en el marco del mismo convenio de colaboración con el Hospital Universitario Clínico San Cecilio de Granada. En ese momento se disponía de 125 pacientes. Aunque el registro ya incluía distintos tipos de complicaciones, el problema se planteó como una clasificación binaria entre pacientes con alguna complicación y pacientes sin complicaciones. Esta formulación permitió realizar una primera evaluación de la viabilidad de predecir el riesgo asociado a la biopsia, pero no diferenció entre hemorragia y neumotórax ni consideró que ambos eventos pudieran presentarse simultáneamente.
+
+El trabajo previo comparó tres fuentes principales de información: las variables clínicas, las características radiómicas extraídas de las imágenes y los volúmenes tridimensionales de tomografía computarizada. En la rama radiómica se evaluaron modelos clásicos como regresión logística, máquinas de vectores soporte, árboles de decisión, k vecinos más próximos y distintos métodos de ensamblado. Las características radiómicas también se combinaron con las variables clínicas y con técnicas de aprendizaje de métricas, como Neighborhood Components Analysis y Large Margin Nearest Neighbor, para estudiar si una transformación del espacio de características mejoraba la separación entre pacientes con y sin complicaciones.
+
+De forma paralela, se estudiaron modelos de deep learning (DL) capaces de procesar directamente los volúmenes tridimensionales. Se consideraron arquitecturas basadas en DenseNet y ResNet 3D, estrategias de transferencia de aprendizaje y un modelo multimodal que combinó una rama de imagen con otra de variables clínicas. El rendimiento se evaluó mediante validación cruzada estratificada de cinco folds y se utilizaron métricas como la exactitud, el F1-score, la sensibilidad, la especificidad y la media geométrica. Además, se emplearon SHAP para analizar la contribución de las variables y características radiómicas, y Grad-CAM para visualizar las regiones de las imágenes que más influyeron en las predicciones de las redes.
+
+Los mejores resultados se obtuvieron con los métodos basados en radiómica. La combinación de características radiómicas, variables clínicas y aprendizaje de métricas alcanzó una media geométrica de 0,747, mientras que el modelo LightGBM entrenado con radiómica y variables clínicas obtuvo 0,746. En comparación, el mejor modelo tridimensional de referencia, basado en DenseNet121, alcanzó una media geométrica de 0,691. Las estrategias de preentrenamiento y fusión multimodal no mejoraron este modelo de referencia. Estos resultados mostraron que, con la cantidad de datos disponible, los modelos clásicos basados en radiómica ofrecieron un comportamiento más estable e interpretable que las redes tridimensionales de mayor capacidad. El análisis mediante Grad-CAM también puso de manifiesto que algunas predicciones correctas se apoyaban en regiones pulmonares relevantes, mientras que ciertos errores concentraban la atención en zonas menos informativas o próximas a los límites de la segmentación.
+
+En conjunto, el trabajo previo permitió realizar una primera evaluación de este problema y comparar distintas fuentes de información y estrategias de modelado. Al mismo tiempo, dejó abiertas varias cuestiones relacionadas con el tamaño muestral, la generalización de los modelos, la ausencia de validación en una cohorte independiente y, especialmente, la formulación binaria de las complicaciones. Estas cuestiones constituyen el punto de partida del presente TFM.
+
+
+\section{Propuesta}
+
+A partir de este antecedente, el presente trabajo propone estudiar la predicción previa de complicaciones en biopsias pulmonares guiadas por TC mediante una formulación multietiqueta. Se consideran dos salidas diferenciadas, hemorragia y neumotórax, que pueden presentarse simultáneamente, mientras que la ausencia de complicaciones se deriva de que ninguna de ellas esté presente. Este planteamiento responde mejor al interés clínico por anticipar no solo si se producirá alguna complicación, sino también su tipo. Para reproducir el escenario de uso previsto, se emplea exclusivamente información disponible antes de la biopsia.
+
+La propuesta combina distintas representaciones de los datos clínicos y de imagen, incluyendo variables clínicas, características radiómicas, volúmenes tridimensionales de TC, segmentaciones anatómicas y descriptores geométricos. Estas fuentes se analizan de forma individual y, cuando procede, combinada. El estudio predictivo se complementa con técnicas de Positive-Unlabeled learning (PU learning) para explorar la posible incertidumbre de las etiquetas, descubrimiento de subgrupos para identificar patrones interpretables y métodos de explicabilidad para auditar el comportamiento de los modelos. La finalidad no es desarrollar una herramienta preparada para su aplicación clínica, sino evaluar de forma rigurosa el alcance de la información disponible y establecer una base reproducible para investigaciones posteriores.
+
+
+\section{Objetivos}
+
+% \textcolor{red}{Revisarlos (Son los que se pusieron en el formulario al hacer la propuesta de tfm):}
+
+\begin{itemize}
+    \item Abordar el problema de predicción multimodal y multietiqueta de complicaciones en biopsias pulmonares con técnicas avanzadas de Inteligencia Artificial y análisis de datos.
+    \item Analizar en profundidad las fuentes de información disponibles para determinar la relevancia de variables clínicas, radiómicas e imagen médica en la capacidad predictiva de los modelos.
+    \item Explorar metodologías avanzadas de aprendizaje automático adaptadas a las particularidades del problema, como pueden ser desbalanceo de clases, posible incertidumbre en las etiquetas o identificación de subgrupos relevantes de pacientes, entre otros.
+    \item Diseñar y evaluar modelos predictivos explicables, comparando su rendimiento y su capacidad de proporcionar interpretaciones útiles en un entorno clínico.
+    \item Extraer conclusiones clínicas y metodológicas que ayuden a comprender mejor el problema y orienten futuras líneas de investigación.
+\end{itemize}
+
+
+
+\section{Planificación}
+
+La planificación del trabajo se organizó en un periodo de seis meses, desde marzo hasta agosto de 2026. Durante este tiempo se estructuraron las tareas en varias fases principales: revisión bibliográfica y formación técnica, desarrollo del marco teórico y estado del arte, análisis exploratorio y preprocesamiento de los datos, diseño de modelos, experimentación y redacción de la memoria.
+
+En las primeras semanas se priorizó la revisión de literatura y la familiarización con las herramientas necesarias para el tratamiento de datos clínicos e imagen médica. Posteriormente, se abordó el análisis exploratorio de los datos y el diseño de las estrategias de preprocesamiento. A partir de abril y mayo comenzó el desarrollo de los distintos enfoques de modelado, incluyendo radiómica, modelos de deep learning y técnicas avanzadas como PU learning y descubrimiento de subgrupos. La fase experimental se extendió durante la mayor parte del proyecto, ya que fue necesario comparar distintas configuraciones, ajustar los experimentos y analizar los resultados obtenidos.
+
+Para visualizar la distribución temporal de estas tareas, en la Figura~\ref{fig:planificacion} se muestra el diagrama de Gantt del proyecto.
+
+% \begin{figure}[!htbp]
+%     \centering
+%     \includegraphics[width=1\textwidth]{imagenes/introduccion/Planning_TFM_recortada.png}
+%     \caption{Diagrama de Gantt del proyecto.}
+%     \label{fig:planificacion}
+% \end{figure}
+\begin{figure}[!htbp]
+    \centering
+    \makebox[\textwidth][c]{%
+        \includegraphics[width=1.35\textwidth]{imagenes/introduccion/gantt.pdf}
+    }
+    \caption{Diagrama de Gantt del proyecto. Elaboración propia.}
+    \label{fig:planificacion}
+\end{figure}
+
+
+\section{Estructura de la memoria}
+
+La memoria se organiza en once capítulos. Tras esta introducción, el Capítulo~\ref{chap:estado_del_arte} revisa el estado del arte y el Capítulo~\ref{chap:fundamentos} presenta los fundamentos necesarios. El Capítulo~\ref{chap:planteamiento_problema} concreta el problema, los datos y las restricciones metodológicas, mientras que el Capítulo~\ref{chap:eda} recoge el análisis exploratorio y el preprocesamiento.
+
+Los Capítulos~\ref{chap:radiomica}, \ref{chap:DL}, \ref{chap:pu_learning} y \ref{chap:subgroup_discovery} desarrollan, respectivamente, los experimentos de radiómica, deep learning, PU learning y descubrimiento de subgrupos. El Capítulo~\ref{chap:explicabilidad} analiza la explicabilidad de los modelos seleccionados y el Capítulo~\ref{chap:conclusiones} presenta las conclusiones, limitaciones y líneas futuras.
+
+
+% \section{Bibliografía fundamental?}

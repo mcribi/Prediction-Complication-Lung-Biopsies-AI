@@ -24,6 +24,44 @@ def flatten(prefix: str, payload: dict) -> dict:
     return {f"{prefix}{key}": value for key, value in payload.items()}
 
 
+def collection_should_fail(num_complete_rows: int, errors: list[dict]) -> bool:
+    if num_complete_rows == 0:
+        return True
+    return any(error.get("error_type") != "FileNotFoundError" for error in errors)
+
+
+def validate_predictions_against_thresholds(
+    probabilities: np.ndarray,
+    thresholds: np.ndarray | float,
+    stored_predictions: np.ndarray,
+    name: str,
+    atol: float = 1e-7,
+) -> int:
+    probability_array = np.asarray(probabilities, dtype=float)
+    threshold_array = np.broadcast_to(
+        np.asarray(thresholds, dtype=float), probability_array.shape
+    )
+    prediction_array = np.asarray(stored_predictions, dtype=int)
+    expected = (probability_array >= threshold_array).astype(int)
+    mismatch = prediction_array != expected
+    serialized_tie = np.isclose(
+        probability_array,
+        threshold_array,
+        rtol=0.0,
+        atol=atol,
+    )
+    invalid = mismatch & ~serialized_tie
+    if np.any(invalid):
+        max_difference = float(
+            np.max(np.abs(probability_array[invalid] - threshold_array[invalid]))
+        )
+        raise ValueError(
+            f"{name} predictions are inconsistent with thresholds "
+            f"outside serialization tolerance; max_difference={max_difference}"
+        )
+    return int(np.count_nonzero(mismatch & serialized_tie))
+
+
 def validate_metric_payload(observed: dict, recalculated: dict, name: str) -> None:
     if set(observed) != set(recalculated):
         missing = sorted(set(recalculated) - set(observed))
@@ -102,12 +140,18 @@ def collect_config(config_dir: Path, min_mtime_epoch: float | None = None) -> di
     tuned_predictions = oof[[f"pred_tuned_{label}" for label in TARGET_LABELS]].to_numpy()
     tuned_thresholds = oof[[f"threshold_tuned_{label}" for label in TARGET_LABELS]].to_numpy()
 
-    expected_fixed = (probabilities >= DEFAULT_THRESHOLD).astype(int)
-    expected_tuned = (probabilities >= tuned_thresholds).astype(int)
-    if not np.array_equal(fixed_predictions, expected_fixed):
-        raise ValueError(f"Fixed predictions are inconsistent with probabilities in {config_dir}")
-    if not np.array_equal(tuned_predictions, expected_tuned):
-        raise ValueError(f"Tuned predictions are inconsistent with thresholds in {config_dir}")
+    fixed_serialized_ties = validate_predictions_against_thresholds(
+        probabilities,
+        DEFAULT_THRESHOLD,
+        fixed_predictions,
+        name="Fixed",
+    )
+    tuned_serialized_ties = validate_predictions_against_thresholds(
+        probabilities,
+        tuned_thresholds,
+        tuned_predictions,
+        name="Tuned",
+    )
     if np.any((tuned_thresholds < 0) | (tuned_thresholds > 1)):
         raise ValueError(f"Tuned thresholds outside [0, 1] in {config_dir}")
 
@@ -146,6 +190,8 @@ def collect_config(config_dir: Path, min_mtime_epoch: float | None = None) -> di
         "config_dir": str(config_dir),
         "num_folds_completed": int(len(folds)),
         "all_folds_present": True,
+        "fixed_serialized_threshold_ties": fixed_serialized_ties,
+        "tuned_serialized_threshold_ties": tuned_serialized_ties,
     }
     row.update(flatten("fixed_oof_", fixed_oof))
     row.update(flatten("tuned_oof_", tuned_oof))
@@ -199,16 +245,26 @@ def main() -> None:
         try:
             rows.append(collect_config(config_dir, args.min_mtime_epoch))
         except Exception as exc:
-            errors.append({"config_dir": str(config_dir), "error": str(exc)})
+            errors.append(
+                {
+                    "config_dir": str(config_dir),
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(args.output, index=False)
     error_path = args.output.with_name(f"{args.output.stem}_incomplete.csv")
     pd.DataFrame(errors).to_csv(error_path, index=False)
+    fatal_errors = sum(
+        error.get("error_type") != "FileNotFoundError" for error in errors
+    )
     report = {
         "root": str(args.root),
         "min_mtime_epoch": args.min_mtime_epoch,
         "complete_configurations": len(rows),
         "incomplete_configurations": len(errors),
+        "fatal_validation_errors": int(fatal_errors),
         "table": str(args.output),
         "incomplete_table": str(error_path),
     }
@@ -216,7 +272,7 @@ def main() -> None:
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    if errors or not rows:
+    if collection_should_fail(len(rows), errors):
         raise SystemExit(1)
 
 
