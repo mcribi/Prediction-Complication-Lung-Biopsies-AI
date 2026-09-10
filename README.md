@@ -1,5 +1,7 @@
 # Técnicas avanzadas de Inteligencia Artificial para predicción y caracterización de complicaciones en biopsias pulmonares
 
+> 🌐 **Web interactiva de resultados del TFM:** [Acceder a la web](https://mcribi.github.io/Prediction-Complication-Lung-Biopsies-AI/)
+
 Repositorio de código del Trabajo de Fin de Máster dedicado al estudio de complicaciones asociadas a biopsias pulmonares guiadas por tomografía computarizada.
 
 El proyecto combina información clínica, características geométricas, radiómica y volúmenes de tomografía computarizada. La formulación principal utiliza dos salidas independientes:
