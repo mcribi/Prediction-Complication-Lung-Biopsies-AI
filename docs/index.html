@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Resultados interactivos del TFM sobre predicción y caracterización de complicaciones en biopsias pulmonares.">
+  <meta name="theme-color" content="#f7fbf9">
+  <title>Resultados TFM | Complicaciones en biopsias pulmonares</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="mobile-header">
+    <a class="mark" href="#inicio" aria-label="Inicio">TFM<span>.</span></a>
+    <button id="menuButton" class="icon-button" type="button" aria-expanded="false" aria-controls="sidebar">Menú</button>
+  </header>
+
+  <aside id="sidebar" class="sidebar" aria-label="Navegación principal">
+    <div>
+      <a class="brand" href="#inicio">
+        <span class="brand-mark">TFM</span>
+        <span class="brand-text">Resultados<br><small>Biopsias pulmonares</small></span>
+      </a>
+      <nav id="mainNav">
+        <a href="#resumen" class="active"><span>01</span>Resumen</a>
+        <a href="#radiomica"><span>02</span>Radiómica</a>
+        <a href="#deep-learning"><span>03</span>Deep learning</a>
+        <a href="#pu-learning"><span>04</span>PU learning</a>
+        <a href="#subgrupos"><span>05</span>Subgrupos</a>
+        <a href="#explicabilidad"><span>06</span>Explicabilidad</a>
+        <a href="#conclusiones"><span>07</span>Conclusiones</a>
+      </nav>
+    </div>
+    <div class="sidebar-footer">
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Cambiar tema">◐ <span>Cambiar tema</span></button>
+      <a href="https://github.com/mcribi/Prediction-Complication-Lung-Biopsies-AI" rel="noopener">Ver repositorio ↗</a>
+    </div>
+  </aside>
+
+  <main id="contenido">
+    <section id="inicio" class="hero">
+      <div class="hero-glow"></div>
+      <div class="eyebrow"><span></span> Trabajo Fin de Máster · Ciencia de Datos</div>
+      <div class="hero-title-row">
+        <h1>Técnicas avanzadas de Inteligencia Artificial para predicción y caracterización de complicaciones en biopsias pulmonares</h1>
+        <img class="hero-icon" src="assets/icono-tfm.png" alt="Ilustración de pulmones y aguja de biopsia">
+      </div>
+      <p class="hero-byline">María Cribillés Pérez · 2026</p>
+      <div class="hero-actions">
+        <a class="button primary" href="#resumen">Explorar resultados</a>
+        <a class="button secondary" href="#metodologia">Ver metodología</a>
+      </div>
+      <div class="target-intro">
+        <span class="kicker">Resultados clínicos estudiados</span>
+        <p>Tras una biopsia pulmonar pueden aparecer distintas complicaciones. El estudio modela dos de ellas de forma independiente y deriva la ausencia de ambas.</p>
+      </div>
+      <div class="target-strip" aria-label="Formulación de las salidas">
+        <div><span class="target-dot coral"></span><strong>Hemorragia</strong><small>Sangrado posterior al procedimiento</small></div>
+        <div><span class="target-dot blue"></span><strong>Neumotórax</strong><small>Presencia de aire en el espacio pleural</small></div>
+        <div><span class="target-dot green"></span><strong>Sin complicación</strong><small>Ausencia simultánea de las dos complicaciones</small></div>
+      </div>
+    </section>
+
+    <section id="resumen" class="section">
+      <div class="section-heading">
+        <div><span class="kicker">Visión general</span><h2>Resultados principales</h2></div>
+        <p>Comparación sintética de los enfoques seleccionados.</p>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card accent-green">
+          <span class="metric-label">Radiómica · R07</span>
+          <strong>0,4948</strong>
+          <span>F1 micro</span>
+          <p>Gradient Boosting con características clínicas y radiómicas.</p>
+        </article>
+        <article class="metric-card accent-blue">
+          <span class="metric-label">DL · solo imagen</span>
+          <strong>0,4852</strong>
+          <span>F1 micro ajustado</span>
+          <p>ResNet-18 con selección interna de umbrales.</p>
+        </article>
+        <article class="metric-card accent-violet">
+          <span class="metric-label">PU tabular · hemorragia</span>
+          <strong>0,445</strong>
+          <span>Average precision</span>
+          <p>Bagging PU con representación combinada.</p>
+        </article>
+        <article class="metric-card accent-coral">
+          <span class="metric-label">PU tabular · neumotórax</span>
+          <strong>0,410</strong>
+          <span>Average precision</span>
+          <p>Etiquetado negativo ingenuo con representación combinada.</p>
+        </article>
+      </div>
+
+      <div class="panel comparison-panel">
+        <div class="panel-head">
+          <div><span class="kicker">Comparador</span><h3>Modelos multietiqueta seleccionados</h3></div>
+          <div class="segmented" role="group" aria-label="Métrica del comparador">
+            <button class="active" data-chart-metric="micro" type="button">F1 micro</button>
+            <button data-chart-metric="macro" type="button">F1 macro</button>
+          </div>
+        </div>
+        <div id="overviewChart" class="bar-chart" aria-live="polite"></div>
+        <p id="chartInsight" class="insight"></p>
+      </div>
+
+      <div id="metodologia" class="method-grid">
+        <article><span>01</span><h3>Preprocesamiento</h3><p>Limpieza clínica, preprocesamiento volumétrico y segmentación anatómica.</p></article>
+        <article><span>02</span><h3>Representaciones</h3><p>Variables clínicas, geometría, radiómica y volúmenes tridimensionales.</p></article>
+        <article><span>03</span><h3>Modelado</h3><p>Modelos radiómicos, redes 3D, fusión multimodal y transfer learning.</p></article>
+        <article><span>04</span><h3>Caracterización</h3><p>Descubrimiento de subgrupos y obtención de reglas interpretables.</p></article>
+        <article><span>05</span><h3>Explicabilidad</h3><p>Análisis de características y regiones relevantes mediante SHAP y Grad-CAM.</p></article>
+      </div>
+    </section>
+
+    <section id="radiomica" class="section tinted">
+      <div class="section-heading">
+        <div><span class="kicker">02 · Radiómica</span><h2>Características cuantitativas de imagen</h2></div>
+        <p>Modelos clásicos entrenados con descriptores de intensidad, forma y textura, solos o combinados con información clínica y geométrica.</p>
+      </div>
+      <div class="split-feature">
+        <div class="copy-block">
+          <span class="pill">Mejor configuración global</span>
+          <h3>R07 · Gradient Boosting</h3>
+          <p>La configuración combina características radiómicas básicas de pulmón, nódulo y vasos con variables clínicas.</p>
+          <dl class="stat-list">
+            <div><dt>F1 micro</dt><dd>0,4948</dd></div>
+            <div><dt>F1 macro</dt><dd>0,5011</dd></div>
+            <div><dt>Subset accuracy</dt><dd>0,6000</dd></div>
+          </dl>
+        </div>
+        <figure class="media-card">
+          <img src="assets/validacion-radiomica.png" alt="Esquema de validación de los modelos radiómicos" loading="lazy">
+          <figcaption>Esquema de evaluación empleado en radiómica.</figcaption>
+        </figure>
+      </div>
+      <div class="panel table-panel">
+        <div class="panel-head">
+          <div><span class="kicker">Tabla interactiva</span><h3>Configuraciones destacadas</h3></div>
+          <label class="search-field">Buscar <input id="radiomicsSearch" type="search" placeholder="Modelo, máscara, datos…"></label>
+        </div>
+        <div class="table-wrap"><table id="radiomicsTable"><thead><tr><th data-sort="id">ID</th><th data-sort="model">Modelo</th><th data-sort="features">Características</th><th data-sort="data">Datos adicionales</th><th data-sort="masks">Máscaras</th><th data-sort="micro">F1 micro</th><th data-sort="macro">F1 macro</th><th data-sort="subset">Subset acc.</th></tr></thead><tbody></tbody></table></div>
+        <p class="table-note">Selecciona una cabecera para ordenar. P: pulmón; N: nódulo; V: vasos; B: tráquea y bronquios.</p>
+      </div>
+
+      <div class="panel table-panel">
+        <div class="panel-head">
+          <div><span class="kicker">Desglose por resultado</span><h3>Resultados por etiqueta y ausencia de complicación</h3></div>
+          <div class="segmented" role="group" aria-label="Resultado radiómico">
+            <button class="active" data-radiomics-target="hemorrhage" type="button">Hemorragia</button>
+            <button data-radiomics-target="pneumothorax" type="button">Neumotórax</button>
+            <button data-radiomics-target="none" type="button">Sin complicación</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="radiomicsClassTable"><thead><tr><th data-class-sort="id">ID</th><th data-class-sort="model">Modelo</th><th data-class-sort="data">Datos adicionales</th><th data-class-sort="precision">Precisión</th><th data-class-sort="sensitivity">Sensibilidad</th><th data-class-sort="f1">F1</th><th data-class-sort="specificity">Especificidad</th></tr></thead><tbody></tbody></table></div>
+        <p class="table-note">Media ± desviación estándar entre las cinco particiones. «Sin complicación» se deriva de la ausencia simultánea de hemorragia y neumotórax; no es una tercera salida del modelo.</p>
+      </div>
+    </section>
+
+    <section id="deep-learning" class="section">
+      <div class="section-heading">
+        <div><span class="kicker">03 · Deep learning</span><h2>Aprendizaje de volúmenes 3D</h2></div>
+        <p>Comparación entre modelos basados únicamente en imagen, fusión con variables clínicas y transferencia de aprendizaje.</p>
+      </div>
+      <figure class="validation-banner">
+        <img src="assets/validacion-dl.png" alt="Esquema de validación de los modelos de deep learning" loading="lazy">
+        <figcaption>Validación anidada: selección interna para entrenamiento y evaluación final sobre pacientes no utilizados para ajustar el modelo.</figcaption>
+      </figure>
+      <div class="tabs" role="tablist" aria-label="Familia de deep learning">
+        <button class="active" type="button" role="tab" aria-selected="true" data-dl-tab="image">Solo imagen</button>
+        <button type="button" role="tab" aria-selected="false" data-dl-tab="multimodal">Multimodal</button>
+        <button type="button" role="tab" aria-selected="false" data-dl-tab="transfer">Transferencia</button>
+      </div>
+      <div class="panel table-panel">
+        <div class="panel-head"><div><span class="kicker">Resultados</span><h3 id="dlTableTitle">Mejor configuración por arquitectura</h3></div></div>
+        <div class="table-wrap"><table id="dlTable"><thead></thead><tbody></tbody></table></div>
+        <p id="dlNote" class="table-note"></p>
+      </div>
+      <div class="callout"><strong>Análisis.</strong><span>La fusión multimodal y el preentrenamiento no produjeron una mejora consistente frente a los modelos entrenados únicamente con imagen.</span></div>
+    </section>
+
+    <section id="pu-learning" class="section tinted">
+      <div class="section-heading">
+        <div><span class="kicker">04 · PU learning</span><h2>Incertidumbre en las etiquetas negativas</h2></div>
+        <p>Se comparan referencias supervisadas y métodos que modelan explícitamente los casos positivos y no etiquetados.</p>
+      </div>
+      <div class="panel table-panel">
+        <div class="panel-head">
+          <div><span class="kicker">Experimento tabular</span><h3>Formulaciones por representación</h3></div>
+          <div class="segmented" role="group" aria-label="Objetivo PU tabular">
+            <button class="active" data-pu-target="hemorrhage" type="button">Hemorragia</button>
+            <button data-pu-target="pneumothorax" type="button">Neumotórax</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="puTable"><thead><tr><th data-sort="representation">Representación</th><th data-sort="method">Formulación</th><th data-sort="ap">AP</th><th data-sort="auc">AUC</th><th data-sort="f1">F1</th><th data-sort="sensitivity">Sens.</th><th data-sort="specificity">Esp.</th><th data-sort="gmean">G-mean</th><th data-sort="mcc">MCC</th><th data-sort="brier">Brier</th></tr></thead><tbody></tbody></table></div>
+        <p class="table-note">AP: average precision; AUC: área bajo la curva ROC. Un Brier menor indica menor error probabilístico.</p>
+      </div>
+      <div class="split-feature pu-3d">
+        <div class="copy-block">
+          <span class="pill">Extensión 3D</span>
+          <h3>PU learning sobre volúmenes</h3>
+          <p>La comparación incluye entrenamiento supervisado, corrección Elkan-Noto y nnPU con una ResNet-18 tridimensional.</p>
+          <div id="pu3dCards" class="mini-cards"></div>
+        </div>
+        <figure class="media-card">
+          <img src="assets/validacion-pu.png" alt="Esquema de validación anidada de PU learning" loading="lazy">
+          <figcaption>Selección interna y evaluación separada por paciente.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="subgrupos" class="section">
+      <div class="section-heading">
+        <div><span class="kicker">05 · Descubrimiento de subgrupos</span><h2>Reglas interpretables</h2></div>
+        <p>Patrones descriptivos que caracterizan grupos concretos. Las reglas pueden solaparse y no implican causalidad.</p>
+      </div>
+      <div class="filter-row" role="group" aria-label="Filtrar reglas por objetivo">
+        <button class="chip active" data-rule-target="all" type="button">Todas</button>
+        <button class="chip" data-rule-target="Hemorragia" type="button">Hemorragia</button>
+        <button class="chip" data-rule-target="Neumotórax" type="button">Neumotórax</button>
+        <button class="chip" data-rule-target="Sin complicación" type="button">Sin complicación</button>
+      </div>
+      <div id="ruleGrid" class="rule-grid"></div>
+      <div class="panel table-panel subgroup-panel">
+        <div class="panel-head"><div><span class="kicker">Análisis exploratorio</span><h3>Modelo general frente a especializado</h3></div></div>
+        <div id="subgroupChart" class="paired-chart"></div>
+        <p class="table-note">Diferencia de F1 micro dentro de cada subgrupo. La selección de reglas y la evaluación se realizaron sobre la misma cohorte, por lo que el análisis es exploratorio.</p>
+      </div>
+    </section>
+
+    <section id="explicabilidad" class="section tinted">
+      <div class="section-heading">
+        <div><span class="kicker">06 · Explicabilidad</span><h2>Cómo se construyen las predicciones</h2></div>
+        <p>Grad-CAM permite estudiar regiones de atención en los modelos 3D. SHAP resume la contribución de las características radiómicas.</p>
+      </div>
+      <div class="explain-subheading first">
+        <span class="kicker">Modelos tridimensionales</span>
+        <h3>Mapas Grad-CAM</h3>
+        <p>En cada composición, la primera columna muestra el corte de TC, la segunda el mapa para hemorragia y la tercera el mapa para neumotórax. El contorno blanco delimita el nódulo y los colores cálidos indican una contribución positiva relativa mayor.</p>
+      </div>
+      <div class="explain-grid gradcam-grid">
+        <button class="image-card" type="button" data-lightbox="assets/gradcam-caso-1.jpg" data-caption="Paciente clasificado correctamente como negativo para hemorragia y neumotórax. Cuatro cortes axiales consecutivos con presencia de la máscara nodular.">
+          <img src="assets/gradcam-caso-1.jpg" alt="Mapas Grad-CAM de un caso negativo para ambas complicaciones" loading="lazy"><span>Caso 1 · Negativo para ambas complicaciones</span>
+        </button>
+        <button class="image-card" type="button" data-lightbox="assets/gradcam-caso-2.jpg" data-caption="Paciente clasificado correctamente como positivo para hemorragia y neumotórax. Cuatro cortes axiales consecutivos con presencia de la máscara nodular.">
+          <img src="assets/gradcam-caso-2.jpg" alt="Mapas Grad-CAM de un caso positivo para ambas complicaciones" loading="lazy"><span>Caso 2 · Positivo para ambas complicaciones</span>
+        </button>
+        <button class="image-card" type="button" data-lightbox="assets/gradcam-caso-3.jpg" data-caption="Paciente clasificado incorrectamente como positivo para hemorragia y correctamente como positivo para neumotórax. Cuatro cortes axiales consecutivos con presencia de la máscara nodular.">
+          <img src="assets/gradcam-caso-3.jpg" alt="Mapas Grad-CAM de un falso positivo de hemorragia y verdadero positivo de neumotórax" loading="lazy"><span>Caso 3 · Predicciones diferentes por salida</span>
+        </button>
+      </div>
+      <div class="explain-subheading">
+        <span class="kicker">Modelos radiómicos</span>
+        <h3>Valores SHAP</h3>
+        <p>Las distribuciones globales muestran la dirección de las contribuciones y los gráficos de importancia resumen su magnitud media.</p>
+      </div>
+      <div class="explain-grid">
+        <button class="image-card" type="button" data-lightbox="assets/shap-beeswarm-hemorragia.png" data-caption="Distribución global de valores SHAP para hemorragia">
+          <img src="assets/shap-beeswarm-hemorragia.png" alt="Gráfico SHAP global para hemorragia" loading="lazy"><span>SHAP global · Hemorragia</span>
+        </button>
+        <button class="image-card" type="button" data-lightbox="assets/shap-beeswarm-neumotorax.png" data-caption="Distribución global de valores SHAP para neumotórax">
+          <img src="assets/shap-beeswarm-neumotorax.png" alt="Gráfico SHAP global para neumotórax" loading="lazy"><span>SHAP global · Neumotórax</span>
+        </button>
+        <button class="image-card" type="button" data-lightbox="assets/shap-importancia-hemorragia.png" data-caption="Importancia radiómica global para hemorragia">
+          <img src="assets/shap-importancia-hemorragia.png" alt="Importancia SHAP para hemorragia" loading="lazy"><span>Importancia · Hemorragia</span>
+        </button>
+        <button class="image-card" type="button" data-lightbox="assets/shap-importancia-neumotorax.png" data-caption="Importancia radiómica global para neumotórax">
+          <img src="assets/shap-importancia-neumotorax.png" alt="Importancia SHAP para neumotórax" loading="lazy"><span>Importancia · Neumotórax</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="conclusiones" class="section conclusion-section">
+      <div class="section-heading">
+        <div><span class="kicker">07 · Conclusiones</span><h2>Análisis de resultados</h2></div>
+      </div>
+      <div class="conclusion-grid">
+        <article><span>01</span><h3>Rendimiento limitado</h3><p>Los resultados no respaldan una capacidad predictiva suficiente para una aplicación clínica. La radiómica obtuvo la mejor síntesis global, con diferencias reducidas respecto a los modelos tridimensionales.</p></article>
+        <article><span>02</span><h3>Más modalidades no garantizan mejora</h3><p>La incorporación de variables clínicas a los modelos 3D y las estrategias de transferencia no mejoraron de forma consistente el rendimiento.</p></article>
+        <article><span>03</span><h3>PU depende del contexto</h3><p>Las ventajas relativas de las formulaciones PU variaron según la complicación y la representación. La extensión tridimensional presentó una variabilidad elevada.</p></article>
+        <article><span>04</span><h3>Subgrupos exploratorios</h3><p>Las reglas permiten describir perfiles locales, pero su estabilidad y el tamaño de la cohorte exigen una interpretación prudente y validación independiente.</p></article>
+      </div>
+    </section>
+
+    <footer><p>Trabajo Fin de Máster · María Cribillés Pérez · Universidad de Granada</p><a href="#inicio">Volver arriba ↑</a></footer>
+  </main>
+
+  <dialog id="lightbox">
+    <button id="closeLightbox" class="lightbox-close" type="button" aria-label="Cerrar">×</button>
+    <img id="lightboxImage" alt="">
+    <p id="lightboxCaption"></p>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script src="radiomics-by-class.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
