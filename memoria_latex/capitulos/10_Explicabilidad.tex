@@ -18,7 +18,7 @@ La Figura~\ref{fig:gradcam-caso-1} muestra un paciente clasificado correctamente
 
 \begin{figure}[!htbp]
     \centering
-    \includeprivategraphic[width=\textwidth]{imagenes/explicabilidad/gradcam_caso_1.jpg}
+    \includegraphics[width=\textwidth]{imagenes/explicabilidad/gradcam_caso_1.jpg}
     \caption{Mapas Grad-CAM de un paciente clasificado correctamente como negativo para hemorragia y neumotórax. Se muestran cuatro cortes axiales consecutivos con presencia de la máscara nodular. Elaboración propia.}
     \label{fig:gradcam-caso-1}
 \end{figure}
@@ -27,7 +27,7 @@ En el paciente mostrado en la Figura~\ref{fig:gradcam-caso-2}, ambas complicacio
 
 \begin{figure}[!htbp]
     \centering
-    \includeprivategraphic[width=\textwidth]{imagenes/explicabilidad/gradcam_caso_2.jpg}
+    \includegraphics[width=\textwidth]{imagenes/explicabilidad/gradcam_caso_2.jpg}
     \caption{Mapas Grad-CAM del paciente clasificado correctamente como positivo para hemorragia y neumotórax. Se muestran cuatro cortes axiales consecutivos con presencia de la máscara nodular. Elaboración propia.}
     \label{fig:gradcam-caso-2}
 \end{figure}
@@ -36,7 +36,7 @@ La Figura~\ref{fig:gradcam-caso-3} corresponde a un paciente para el que el mode
 
 \begin{figure}[!htbp]
     \centering
-    \includeprivategraphic[width=\textwidth]{imagenes/explicabilidad/gradcam_caso_3.jpg}
+    \includegraphics[width=\textwidth]{imagenes/explicabilidad/gradcam_caso_3.jpg}
     \caption{Mapas Grad-CAM del paciente clasificado incorrectamente como positivo para hemorragia y correctamente como positivo para neumotórax. Se muestran cuatro cortes axiales consecutivos con presencia de la máscara nodular. Elaboración propia.}
     \label{fig:gradcam-caso-3}
 \end{figure}
@@ -52,9 +52,9 @@ SHAP (\textit{SHapley Additive exPlanations}) es una técnica de explicabilidad 
 
 El análisis se ha aplicado a la configuración radiómica R07, que obtuvo el mayor F1 micro OOF. Esta configuración combina un clasificador \textit{Gradient Boosting} con una cadena de clasificadores y utiliza información procedente de las máscaras de pulmón, nódulo y vasos, además de variables clínicas. La matriz de entrada contiene inicialmente 368 predictores, de los cuales 321 son características radiómicas y 47 son variables clínicas. En cada conjunto de entrenamiento externo se aplicó un filtro de varianza con umbral 0,01, que conservó entre 260 y 263 variables según el \textit{fold}.
 
-% Para evitar que las explicaciones se calculen sobre pacientes utilizados durante el ajuste del modelo, se ha seguido el mismo esquema de validación externa empleado en la evaluación. En cada uno de los cinco \textit{folds} se ha reajustado el modelo exclusivamente con el conjunto de entrenamiento externo y se ha aplicado SHAP sobre los pacientes de prueba correspondientes. De este modo, cada uno de los 195 pacientes ha sido explicado mediante un modelo que no ha utilizado sus datos durante el entrenamiento. Las probabilidades obtenidas al reajustar los modelos han reproducido las predicciones OOF almacenadas, con un error absoluto máximo de \(1{,}11 \times 10^{-16}\). La propiedad de aditividad de las explicaciones también se ha verificado, con un error máximo de \(7{,}77 \times 10^{-16}\).
+Para obtener explicaciones OOF, en cada uno de los cinco \textit{folds} se ha ajustado el modelo con el entrenamiento externo y se ha aplicado SHAP a los pacientes del test externo correspondiente. Las explicaciones de las cinco particiones se han combinado posteriormente, de manera que cada uno de los 205 pacientes ha sido explicado por un modelo entrenado sin sus datos.
 
-Debido a que el estimador utilizado pertenece a una familia de árboles, las contribuciones se han calculado mediante \texttt{TreeExplainer}. Para hemorragia, el explicador recibe las variables conservadas por el filtro de varianza en cada \textit{fold}. En el caso de neumotórax, se añade la predicción binaria previa de hemorragia, puesto que esta forma parte de la entrada utilizada por el segundo clasificador. Por tanto, esta variable debe considerarse al interpretar la dependencia aprendida entre ambas salidas.
+Debido a que el estimador utilizado pertenece a una familia de árboles, las contribuciones se han calculado mediante \texttt{TreeExplainer}. La cadena de clasificadores sigue el orden hemorragia--neumotórax. El primer clasificador estima la presencia de hemorragia a partir de las variables radiómicas y clínicas, mientras que el segundo recibe esas mismas variables junto con la predicción binaria generada por el primero para estimar el neumotórax. Durante la evaluación, la entrada proporcionada al segundo clasificador ha sido la predicción de hemorragia generada por el primero, y no la etiqueta real del paciente. Por tanto, el procedimiento no utiliza información sobre el resultado real del conjunto de prueba y puede aplicarse del mismo modo a pacientes nuevos. Su contribución SHAP representa la dependencia aprendida entre las salidas, no una relación clínica causal entre ambas complicaciones.
 
 Las Figuras~\ref{fig:shap-beeswarm-hemorragia} y~\ref{fig:shap-importancia-hemorragia} presentan el análisis global para hemorragia. En el diagrama de enjambre, las variables se encuentran ordenadas según la media de sus valores SHAP absolutos. Cada punto representa la explicación OOF de un paciente, su posición horizontal indica la contribución a la salida interna del modelo y el color representa el valor de la variable. El gráfico de barras resume la misma información mediante la media del valor SHAP absoluto, por lo que representa la magnitud de la contribución, pero no su dirección.
 
@@ -72,9 +72,13 @@ Las Figuras~\ref{fig:shap-beeswarm-hemorragia} y~\ref{fig:shap-importancia-hemor
 \label{fig:shap-importancia-hemorragia}
 \end{figure}
 
-Las mayores contribuciones para la predicción de hemorragia corresponden a la desviación absoluta media de las intensidades pulmonares, el diámetro bidimensional máximo de la máscara vascular, la no uniformidad de las longitudes de racha del nódulo y la elongación del nódulo. Estas variables describen aspectos relacionados con la dispersión de las intensidades, la geometría de las regiones segmentadas y la heterogeneidad de las texturas. También aparece entre las primeras posiciones la presencia de EPOC. Este resultado presenta coherencia clínica con la valoración del equipo médico, que señaló esta patología como uno de los antecedentes considerados al evaluar el riesgo asociado con la biopsia pulmonar. Por tanto, su relevancia para el modelo constituye un resultado clínicamente plausible. No obstante, dado que la EPOC solo está presente en cuatro pacientes de la cohorte analizada, la magnitud y estabilidad de su contribución no pueden estimarse con suficiente precisión. En consecuencia, este hallazgo debe interpretarse como una observación exploratoria concordante con el criterio clínico, pero no como evidencia de una asociación generalizable o causal.
+% Las mayores contribuciones para la predicción de hemorragia corresponden a la desviación absoluta media de las intensidades pulmonares, el diámetro bidimensional máximo de la máscara vascular, la no uniformidad de las longitudes de racha del nódulo y la elongación del nódulo. Estas variables describen aspectos relacionados con la dispersión de las intensidades, la geometría de las regiones segmentadas y la heterogeneidad de las texturas. También aparece entre las primeras posiciones la presencia de EPOC. Este resultado presenta coherencia clínica con la valoración del equipo médico, que señaló esta patología como uno de los antecedentes considerados al evaluar el riesgo asociado con la biopsia pulmonar. Por tanto, su relevancia para el modelo constituye un resultado clínicamente plausible. No obstante, dado que la EPOC solo está presente en cuatro pacientes de la cohorte analizada, la magnitud y estabilidad de su contribución no pueden estimarse con suficiente precisión. En consecuencia, este hallazgo debe interpretarse como una observación exploratoria concordante con el criterio clínico, pero no como evidencia de una asociación generalizable o causal.
 
-Las Figuras~\ref{fig:shap-beeswarm-neumotorax} y~\ref{fig:shap-importancia-neumotorax} muestran el análisis equivalente para neumotórax. Las variables con mayor media del valor SHAP absoluto incluyen la medida de correlación máxima de la matriz de coocurrencia del nódulo, la longitud del eje menor de la máscara vascular y varios descriptores de no uniformidad y distribución de zonas de la región vascular. También aparecen entre las primeras posiciones medidas relacionadas con la extensión de regiones homogéneas del nódulo y con la amplitud de su distribución de intensidades.
+Las mayores contribuciones para la predicción de hemorragia corresponden a la desviación absoluta media de las intensidades pulmonares, el diámetro bidimensional máximo de la máscara vascular, la no uniformidad de las longitudes de racha del nódulo y la elongación del nódulo. Los valores elevados de la desviación absoluta media y de la no uniformidad de las longitudes de racha han tendido a reducir la salida del modelo, al igual que los valores reducidos del diámetro vascular. Estas variables describen aspectos relacionados con la dispersión de las intensidades, la geometría de las regiones segmentadas y la heterogeneidad de las texturas.
+
+También aparece entre las primeras posiciones la presencia de EPOC, resultado coherente con la valoración del equipo médico, que señaló esta patología como uno de los antecedentes considerados al evaluar el riesgo asociado con la biopsia pulmonar. No obstante, la EPOC solo está presente en cuatro pacientes de la cohorte, por lo que este hallazgo debe interpretarse como una observación exploratoria y no como evidencia de una asociación generalizable o causal.
+
+Las Figuras~\ref{fig:shap-beeswarm-neumotorax} y~\ref{fig:shap-importancia-neumotorax} muestran el análisis equivalente para neumotórax. Las variables con mayor contribución incluyen la medida de correlación máxima de la matriz de coocurrencia del nódulo, la longitud del eje menor de la máscara vascular y varios descriptores de no uniformidad y distribución de zonas de la región vascular. Los valores bajos de las dos primeras variables han tendido a reducir la salida asociada con neumotórax. También aparecen entre las primeras posiciones medidas relacionadas con la extensión de regiones homogéneas del nódulo y con la amplitud de su distribución de intensidades.
 
 \begin{figure}[!htbp]
 \centering
@@ -97,20 +101,20 @@ Para complementar el análisis global se han generado explicaciones locales de l
 
 \begin{figure}[!htbp]
 \centering
-\includeprivategraphic[width=\textwidth]{imagenes/explicabilidad/shap_local_representative_Hemorragia.pdf}
+\includegraphics[width=\textwidth]{imagenes/explicabilidad/shap_local_representative_Hemorragia.pdf}
 \caption{Explicaciones SHAP locales representativas para hemorragia. Se muestran un verdadero positivo, un verdadero negativo, un falso positivo y un falso negativo. Elaboración propia.}
 \label{fig:shap-local-hemorragia}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
-\includeprivategraphic[width=\textwidth]{imagenes/explicabilidad/shap_local_representative_Neumotorax.pdf}
+\includegraphics[width=\textwidth]{imagenes/explicabilidad/shap_local_representative_Neumotorax.pdf}
 \caption{Explicaciones SHAP locales representativas para neumotórax. Se muestran un verdadero positivo, un verdadero negativo, un falso positivo y un falso negativo. Elaboración propia.}
 \label{fig:shap-local-neumotorax}
 \end{figure}
 
-Las explicaciones locales muestran que cada predicción resulta de la combinación de contribuciones positivas y negativas de variables procedentes de distintas regiones y familias de características. En los casos seleccionados no se observa una única característica que determine por sí sola los aciertos o los errores. Los gráficos permiten describir cómo se ha construido cada predicción individual, pero el reducido número de ejemplos mostrados no permite establecer un patrón general de error.
+Las explicaciones locales muestran que cada predicción resulta de la combinación de contribuciones positivas y negativas procedentes de distintas regiones y familias de características. En los falsos positivos se observan variables que reducen la salida y se oponen a la decisión positiva, mientras que en los falsos negativos algunas contribuciones favorecen la presencia de la complicación sin llegar a compensar el efecto conjunto de las restantes. Por tanto, no se aprecia una única variable que determine por sí sola los aciertos o los errores. La presencia de contribuciones relevantes en sentidos opuestos podría ayudar a identificar casos para revisión manual, aunque los valores SHAP no constituyen una medida calibrada de incertidumbre y el reducido número de ejemplos no permite establecer un patrón general de error ni definir directamente un sistema automático de alerta.
 
-En conjunto, SHAP ha permitido identificar las variables con mayor contribución y estudiar la dependencia introducida entre las dos salidas por la cadena de clasificadores. Las explicaciones muestran una influencia distribuida de las características pulmonares, nodulares y vasculares, con una aportación global menor de las variables clínicas. Entre estas últimas destaca la presencia de EPOC, cuya relevancia para la predicción de hemorragia resulta concordante con la valoración del equipo médico, aunque debe interpretarse con cautela debido al reducido número de pacientes que presentan esta patología. Asimismo, la elevada dimensionalidad, el tamaño limitado de la cohorte, la correlación entre numerosos descriptores y el rendimiento predictivo moderado del modelo obligan a considerar estos resultados como una descripción exploratoria del comportamiento de R07, no como evidencia de asociaciones clínicas causales o necesariamente reproducibles.
+En conjunto, SHAP ha permitido identificar las variables con mayor contribución, analizar la dirección de sus efectos sobre la salida del modelo y estudiar la dependencia introducida por la cadena de clasificadores. Las explicaciones muestran una influencia distribuida de las características pulmonares, nodulares y vasculares, con una aportación global menor de las variables clínicas. No obstante, la elevada dimensionalidad, el tamaño limitado de la cohorte, la correlación entre numerosos descriptores y el rendimiento predictivo moderado obligan a interpretar estos resultados como una descripción exploratoria del comportamiento de R07, no como evidencia de asociaciones clínicas causales o necesariamente reproducibles.
 
 \endinput

@@ -10,10 +10,9 @@ El análisis exploratorio se ha realizado por separado sobre los estudios de TC 
 
 %-------------------------------------------%
 \subsection{Análisis de datos de volúmenes DICOM}
+Antes de establecer la cohorte final, se revisaron la calidad de los registros y la correspondencia entre los datos clínicos y los estudios de imagen. Durante este proceso se detectó un número reducido de casos problemáticos, incluidos posibles registros duplicados de un mismo paciente y volúmenes repetidos asociados a información tabular diferente. Estos casos se descartaron para evitar que un mismo paciente o estudio apareciera más de una vez o quedara vinculado a información clínica incorrecta. Tras este proceso de depuración, la cohorte final quedó formada por 210 pacientes.
 
-El análisis de las imágenes de TC se ha realizado inicialmente sobre los datos disponibles en formato DICOM. De los 210 pacientes de la cohorte inicial, se han identificado imágenes de TC válidas para 209 pacientes. Posteriormente, al comprobar su correspondencia con los volúmenes convertidos a formato NIfTI, se han encontrado 206 volúmenes disponibles, por lo que cuatro pacientes no se han incorporado a los análisis posteriores de imagen.
-
-Durante la comprobación de la correspondencia entre ambas fuentes se ha detectado un número muy reducido de volúmenes repetidos asociados a registros tabulares con información diferente. Esta inconsistencia podría deberse a un error durante la recogida o la asociación de los datos por parte del equipo médico. Para evitar que un mismo estudio apareciera vinculado a pacientes distintos, los casos duplicados se han eliminado de los análisis posteriores basados en imagen.
+En esta cohorte se identificaron imágenes de TC válidas en formato DICOM para 209 pacientes. Posteriormente, al comprobar su correspondencia con los volúmenes convertidos a formato NIfTI, se encontraron 206 volúmenes disponibles. Por tanto, cuatro pacientes de la cohorte final no se incorporaron a los análisis posteriores basados en imagen.
 
 Los volúmenes han presentado una elevada variabilidad en el número de cortes. Como muestra la Figura~\ref{fig:eda_tc_num_cortes}, la mediana ha sido de 292 cortes, con un rango entre 1 y 1102 y un rango intercuartílico entre 227 y 497.
 
@@ -37,7 +36,7 @@ También se han observado diferencias en la resolución en plano, el espaciado e
     \label{fig:eda_dicom_heterogeneidad}
 \end{figure}
 
-Los metadatos también han mostrado variabilidad entre fabricantes, modelos de escáner, algoritmos de reconstrucción, valores de kVp, exposición y grosor de corte. Estas diferencias pueden introducir variabilidad técnica no relacionada con las complicaciones y constituyen una posible fuente de efecto de lote.
+Los metadatos también han mostrado variabilidad entre fabricantes, modelos de escáner, algoritmos de reconstrucción, valores de kVp, exposición y grosor de corte. Estas diferencias pueden alterar de forma sistemática la resolución, las intensidades y las características de textura de las imágenes, haciendo que los estudios adquiridos con distintos equipos o protocolos presenten variaciones de origen técnico y no biológico. Por ello, constituyen una posible fuente de heterogeneidad y confusión para los modelos.
 
 Las intensidades se han convertido a unidades HU. A continuación, se han calculado estadísticos robustos sobre cortes muestreados de cada estudio. Como muestra la Figura~\ref{fig:eda_dicom_hu}, la mediana de \texttt{HU\_p50} ha sido aproximadamente de $-877$ HU, mientras que las intensidades superiores han reflejado la presencia de tejidos blandos y estructuras de mayor densidad.
 
@@ -52,7 +51,7 @@ El análisis ha permitido detectar un estudio con intensidades atípicas y dos c
 
 \begin{figure}[!htbp]
     \centering
-    \includeprivategraphic[width=\textwidth]{imagenes/eda/control_visual_calidad_ct_publica.png}
+    \includegraphics[width=\textwidth]{imagenes/eda/control_visual_calidad_ct.png}
     \caption{Control visual de calidad mediante cortes centrales de TC principales seleccionadas. Se incluyen ejemplos de pacientes con pocos cortes, muchos cortes, espaciado Z elevado y casos seleccionados aleatoriamente.}
     \label{fig:eda_dicom_control_visual}
 \end{figure}
@@ -162,6 +161,7 @@ Tras esta exclusión, la cohorte elegible para la formulación multietiqueta est
     \label{fig:eda_soporte_etiquetas}
 \end{figure}
 
+La Figura~\ref{fig:eda_numero_complicaciones} resume el número de tipos de complicación registrados por paciente.
 
 \begin{figure}[!htbp]
     \centering
@@ -179,12 +179,12 @@ Para completar el análisis multietiqueta, se estudió la coocurrencia entre com
     \label{fig:eda_coocurrencia_complicaciones}
 \end{figure}
 
-Desde el punto de vista demográfico, se analizó en primer lugar la edad, al ser la única variable cuantitativa de la cohorte. En la Figura~\ref{fig:eda_edad_distribucion_complicacion} se muestra su distribución global, representada tras la normalización aplicada en el preprocesamiento, y su comparación descriptiva en los pacientes positivos para las principales etiquetas de complicación. La distribución se concentra en valores altos del rango normalizado, lo que es coherente con una cohorte mayoritariamente formada por pacientes de edad avanzada. Al comparar \textit{Hemorragia}, \textit{Neumotórax} y \textit{Sin\_complicación}, no se aprecia una separación clara entre grupos, aunque las etiquetas de complicación muestran medianas ligeramente superiores a la ausencia de complicación.
+Desde el punto de vista demográfico, se analizó en primer lugar la edad, al ser la única variable cuantitativa de la cohorte. En la Figura~\ref{fig:eda_edad_distribucion_complicacion} se muestra su distribución global en años y su comparación descriptiva entre los pacientes positivos para las principales etiquetas de complicación. La mayor parte de las observaciones se concentra aproximadamente entre los 60 y los 80 años, con una cola hacia edades más jóvenes, lo que refleja una cohorte formada mayoritariamente por pacientes de edad avanzada. Los diagramas de caja muestran un solapamiento considerable entre \textit{Hemorragia}, \textit{Neumotórax} y \textit{Sin complicación}. Las dos complicaciones presentan medianas ligeramente superiores a la ausencia de complicación, aunque no se aprecia una separación clara entre los subconjuntos.
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=1\textwidth]{imagenes/eda/edad_hist_boxplot_complicacion.png}
-    \caption{Distribución global de la edad y comparación descriptiva según las principales etiquetas de complicación.}
+    \includegraphics[width=1\textwidth]{imagenes/eda/edad_sin_normalizar_hist_boxplot_complicacion.png}
+    \caption{Distribución global de la edad en la cohorte y comparación descriptiva según las principales etiquetas de complicación. El panel izquierdo muestra la distribución de la edad en años y el panel derecho presenta los diagramas de caja correspondientes a hemorragia, neumotórax y ausencia de ambas complicaciones.}
     \label{fig:eda_edad_distribucion_complicacion}
 \end{figure}
 
@@ -197,13 +197,23 @@ Además, se realizó un análisis univariante más detallado de la edad mediante
     \label{fig:eda_resumen_edad}
 \end{figure}
 
-También se agrupó la edad en intervalos únicamente con finalidad descriptiva. Como se muestra en la Figura~\ref{fig:eda_grupos_edad}, los grupos más representados son los de 60 a 69 años y 70 a 79 años, lo que confirma la concentración de la cohorte en edades avanzadas.
+También se agrupó la edad en intervalos únicamente con finalidad descriptiva. Como se muestra en la Figura~\ref{fig:eda_grupos_edad}, los grupos más representados son los de 60 a 69 años y 70 a 79 años, lo que confirma la concentración de la cohorte en edades avanzadas. 
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.9\textwidth]{imagenes/eda/grupos_edad.png}
     \caption{Distribución de pacientes por grupo de edad.}
     \label{fig:eda_grupos_edad}
+\end{figure}
+
+
+Como complemento, la Figura~\ref{fig:eda_complicaciones_grupos_edad} muestra la proporción de pacientes con cada resultado dentro de los distintos grupos de edad. En los grupos menores de 50 años predomina el estado sin complicación, mientras que a partir de los 50 años aumenta la proporción de complicaciones, especialmente de neumotórax. La hemorragia presenta una distribución más estable entre los grupos de mayor edad. Estas diferencias deben interpretarse de forma descriptiva, ya que los grupos de menor edad contienen pocos pacientes. 
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth]{imagenes/eda/distribucion_edades_etiquetas.png}
+    \caption{Proporción de pacientes con hemorragia, neumotórax y ausencia de ambas complicaciones dentro de cada grupo de edad.}
+    \label{fig:eda_complicaciones_grupos_edad}
 \end{figure}
 
 
@@ -288,11 +298,11 @@ Tras el análisis de los datos, se procedió al preprocesamiento en Python de am
 
 \subsection{Preprocesamiento de datos de volúmenes DICOM}
 
-El preprocesamiento comprendió la implementación del pipeline mediante MONAI, la homogeneización espacial de los volúmenes, el aumento de datos, la aplicación de ventanas de Hounsfield y la incorporación de segmentaciones anatómicas a las representaciones de entrada.
+El preprocesamiento comprendió la implementación del \textit{pipeline} mediante MONAI, la homogeneización espacial de los volúmenes, el aumento de datos, la aplicación de ventanas de Hounsfield y la incorporación de segmentaciones anatómicas a las representaciones de entrada.
 
 \subsubsection{Uso de MONAI en el procesamiento de imágenes médicas}
 
-El preprocesamiento de los volúmenes DICOM se desarrolló principalmente mediante MONAI, una biblioteca basada en PyTorch y orientada al análisis y modelado de imágenes médicas \cite{cardoso2022monai}. Esta herramienta permite construir flujos de transformación de forma modular, lo que facilita definir pipelines específicos para las fases de entrenamiento y validación. Además de las transformaciones incluidas en MONAI, se incorporaron operaciones personalizadas para adaptar el procesamiento a las características concretas de los estudios de tomografía computarizada utilizados en este trabajo.
+El preprocesamiento de los volúmenes DICOM se desarrolló principalmente mediante MONAI, una biblioteca basada en PyTorch y orientada al análisis y modelado de imágenes médicas \cite{cardoso2022monai}. Esta herramienta permite construir flujos de transformación de forma modular, lo que facilita definir \textit{pipelines} específicos para las fases de entrenamiento y validación. Además de las transformaciones incluidas en MONAI, se incorporaron operaciones personalizadas para adaptar el procesamiento a las características concretas de los estudios de tomografía computarizada utilizados en este trabajo.
 
 \subsubsection{Homogeneización del tamaño de los volúmenes}
 
@@ -303,20 +313,20 @@ Para ello, se utilizó interpolación trilineal, una técnica adecuada para dato
 Durante la fase experimental se probaron diferentes tamaños objetivo. Inicialmente, se trabajó con resoluciones elevadas, como $(256,512,512)$ o $(128,256,256)$, con el fin de conservar la mayor cantidad de información anatómica posible. No obstante, estas configuraciones implicaban un mayor coste computacional y tiempos de entrenamiento más largos. Por ello, también se evaluaron tamaños más reducidos, como $(128,128,128)$, $(64,64,64)$ e incluso $(28,28,28)$, con el objetivo de acelerar el entrenamiento y reducir el consumo de memoria. Las resoluciones más compactas permitían trabajar de forma más eficiente y facilitar la comparación entre experimentos.
 
 
-\subsubsection{Data augmentation}
+\subsubsection{\textit{Data augmentation}}
 
-Con el objetivo de mejorar la capacidad de generalización de los modelos, se incorporaron transformaciones de aumento de datos durante el entrenamiento. Estas transformaciones se aplicaron únicamente sobre el conjunto de entrenamiento, evitando modificar los datos de validación para mantener una evaluación consistente.
+Con el objetivo de mejorar la capacidad de generalización de los modelos, se incorporaron transformaciones de aumento de datos durante el entrenamiento. El aumento de datos se ha aplicado durante el entrenamiento, mientras que los volúmenes de validación se han conservado sin estas transformaciones.
 
 Entre las transformaciones utilizadas se incluyó \texttt{RandAffine}, que permite aplicar de forma aleatoria pequeñas rotaciones, traslaciones y cambios de escala. Estas variaciones simulan diferencias razonables en el posicionamiento del paciente y en la adquisición de las imágenes. Las transformaciones se configuraron con intensidades moderadas para no alterar de forma artificial la anatomía ni introducir deformaciones no realistas, manteniendo así la coherencia clínica de los volúmenes.
 
 
 \subsubsection{Aplicación de ventanas de Hounsfield}
 
-Como se explicó en la Sección~\ref{sec:fundamentos_TC}, las intensidades de las imágenes de TC se expresan en unidades HU, lo que permite relacionar los valores de cada vóxel con la densidad radiológica del tejido. No obstante, el rango completo de HU es muy amplio, por lo que no todos los tejidos pueden visualizarse o analizarse con el mismo nivel de contraste. Por este motivo, se aplicaron ventanas de Hounsfield dentro del pipeline de preprocesamiento, con el objetivo de resaltar rangos de intensidad clínicamente relevantes.
+Como se explicó en la Sección~\ref{sec:fundamentos_TC}, las intensidades de las imágenes de TC se expresan en unidades HU, lo que permite relacionar los valores de cada vóxel con la densidad radiológica del tejido. No obstante, el rango completo de HU es muy amplio, por lo que no todos los tejidos pueden visualizarse o analizarse con el mismo nivel de contraste. Por este motivo, se aplicaron ventanas de Hounsfield dentro del \textit{pipeline} de preprocesamiento, con el objetivo de resaltar rangos de intensidad clínicamente relevantes.
 
 En el contexto de este trabajo, las ventanas se utilizaron para centrar la información de entrada en estructuras de interés para el análisis pulmonar. En particular, se emplearon configuraciones orientadas a resaltar el parénquima pulmonar y otros tejidos relevantes, recortando los valores de intensidad al rango definido por cada ventana y normalizando posteriormente el resultado al intervalo $[0,1]$. Esta normalización permite obtener una representación más homogénea entre estudios y facilita el entrenamiento de los modelos.
 
-Se implementaron dos estrategias principales dentro del pipeline:
+Se implementaron dos estrategias principales dentro del \textit{pipeline}:
 
 \begin{itemize}
     \item \textbf{\texttt{Windowingd}}: aplica una única ventana de intensidad, como la ventana pulmonar, generando un canal de entrada centrado en un rango HU concreto.
@@ -328,7 +338,7 @@ En la Figura~\ref{fig:hu-ejemplo} se muestra un ejemplo de la misma imagen axial
 
 \begin{figure}[!htbp]
     \centering
-    \includeprivategraphic[width=\textwidth]{imagenes/eda/hu_ejemplos.png}
+    \includegraphics[width=\textwidth]{imagenes/eda/hu_ejemplos.png}
     \caption{Comparación de la misma imagen axial de TC preprocesada con diferentes configuraciones de ventana HU: sin ventana, con ventana centrada en -600 HU y ancho 1500, y con ventana centrada en -300 HU y ancho 1400. Se observa cómo el ajuste de ventana modifica el contraste de las estructuras pulmonares. Elaboración propia.}
     \label{fig:hu-ejemplo}
 \end{figure}
@@ -364,7 +374,7 @@ De este modo, la aplicación de ventanas HU permite trasladar al preprocesamient
 
 \subsubsection{Segmentación anatómica}
 
-La generación de las máscaras anatómicas descritas en el Capítulo~\ref{chap:planteamiento_problema} requirió convertir previamente los estudios DICOM al formato NIfTI. Para las segmentaciones automáticas se utilizó \texttt{TotalSegmentator} \cite{wasserthal2023totalsegmentator}, una herramienta basada en modelos de deep learning preentrenados para la delimitación de estructuras anatómicas en imágenes médicas.
+La generación de las máscaras anatómicas descritas en el Capítulo~\ref{chap:planteamiento_problema} requirió convertir previamente los estudios DICOM al formato NIfTI. Para las segmentaciones automáticas se utilizó \texttt{TotalSegmentator} \cite{wasserthal2023totalsegmentator}, una herramienta basada en modelos de \textit{deep learning} preentrenados para la delimitación de estructuras anatómicas en imágenes médicas.
 
 Las máscaras resultantes se almacenaron en directorios diferenciados según la estructura representada y siguiendo una nomenclatura uniforme para cada paciente. Durante su preparación se mantuvo la correspondencia espacial entre cada máscara y su volumen de TC, necesaria para aplicar el enmascaramiento de las imágenes, extraer características radiómicas y construir entradas multicanal. Las formas concretas de incorporación de estas máscaras a los modelos se describen en los capítulos experimentales correspondientes.
 
@@ -375,3 +385,67 @@ El preprocesamiento de los datos clínicos tabulares ha tenido como objetivo ada
 En primer lugar, se han eliminado las columnas que no se iban a utilizar en los modelos, entre ellas \textit{Tipo de cáncer}, ya que el estudio se ha centrado en predecir y caracterizar las complicaciones clínicas registradas. Posteriormente, se han transformado las variables con formato multietiqueta: \textit{Tipo de complicación}, \textit{Factor de riesgo} y \textit{Patología pulmonar}. Dado que estas variables podían contener varias categorías para un mismo paciente, se han codificado mediante una representación binaria multietiqueta utilizando \texttt{MultiLabelBinarizer} de \textit{scikit-learn}. En la variable \textit{Tipo de complicación}, los valores ausentes o marcados con \textit{X} se han interpretado como ausencia simultánea de hemorragia y neumotórax, representada mediante el conjunto vacío de etiquetas y no como una etiqueta independiente. En las variables descriptivas, la ausencia de antecedentes se ha representado mediante categorías explícitas, como \textit{Sin\_factor\_de\_riesgo} y \textit{Sin\_patología\_pulmonar}.
 
 También se ha normalizado la variable \textit{Edad} en el rango $[0,1]$ utilizando \texttt{MinMaxScaler}, con el fin de evitar diferencias de escala respecto al resto de las variables numéricas. Por último, se han codificado las variables categóricas necesarias para el entrenamiento, incluida la transformación de \textit{Sexo} en una variable binaria. La variable \textit{Tipo de complicación} se ha transformado en las etiquetas de hemorragia y neumotórax. Los pacientes sin ninguna de estas complicaciones han quedado representados mediante la ausencia de ambas etiquetas, mientras que el indicador global de complicación se ha conservado únicamente como referencia descriptiva. Como resultado, se ha obtenido un conjunto de datos clínicos limpio, compuesto por variables numéricas y binarias, preparado para su análisis posterior y su incorporación a los modelos predictivos.
+
+\subsection{Resumen de las cohortes experimentales}
+\label{subsec:resumen_cohortes}
+
+La disponibilidad de las distintas fuentes de información no ha sido uniforme para todos los pacientes. Por este motivo, cada bloque experimental se ha realizado sobre la intersección de casos que disponía de las entradas necesarias para el análisis correspondiente. La Tabla~\ref{tab:resumen_cohortes} resume las principales cohortes utilizadas. Los conjuntos no deben interpretarse únicamente como reducciones sucesivas de una misma muestra, ya que algunos se han definido mediante criterios de disponibilidad específicos de cada representación.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\caption{Resumen de las principales cohortes y subconjuntos empleados en el estudio. \(N\) indica el número de pacientes.}
+\label{tab:resumen_cohortes}
+\begin{tabularx}{\textwidth}{p{4.0cm}cX}
+\toprule
+\textbf{Cohorte o bloque} & \(\boldsymbol{N}\) & \textbf{Criterio de disponibilidad o finalidad} \\
+\midrule
+
+Cohorte clínica inicial
+& 210
+& Pacientes con información clínica anonimizada, utilizados para la caracterización descriptiva inicial y como base del análisis clínico de descubrimiento de subgrupos. \\
+
+Cohorte con TC principal
+& 209
+& Pacientes con un estudio DICOM principal válido y correctamente relacionado con la información clínica. \\
+
+Cohorte multietiqueta elegible
+& 209
+& Pacientes considerados para la formulación basada en hemorragia y neumotórax tras excluir del modelado el caso que presentaba únicamente derrame pleural. \\
+
+% Radiómica
+% & 206
+% & Pacientes con información clínica y representaciones de imagen y segmentación utilizables para la extracción y el análisis de características radiómicas. \\
+Radiómica disponible
+& 206
+& Pacientes con una extracción radiómica utilizable \\
+
+Clasificación radiómica
+& 205
+& Pacientes con características radiómicas y etiquetas completas de hemorragia y neumotórax \\
+
+Aprendizaje profundo y PU tridimensional
+& 204
+& Pacientes con etiquetas, volúmenes preprocesados y máscaras requeridas por las entradas tridimensionales. Esta cohorte también se ha utilizado en los experimentos multimodales y de transferencia de aprendizaje. \\
+
+PU learning tabular
+& 205
+& Intersección empleada para comparar las representaciones clínicas y geométricas, radiómicas y combinadas dentro del análisis tabular de PU learning. \\
+
+Descubrimiento de subgrupos con geometría
+& 201
+& Pacientes con medidas geométricas completas del tamaño nodular y de la profundidad respecto a la pleura, utilizados en las representaciones emparejadas. \\
+
+% Análisis SHAP de R07
+% & 195
+% & Pacientes incluidos en las predicciones OOF de la configuración R07 y explicados mediante el modelo correspondiente a su \textit{fold} externo. \\
+Análisis SHAP de R07
+& 205
+& Pacientes incluidos en las predicciones OOF de la configuración R07 y explicados mediante el modelo correspondiente a su \textit{fold} externo. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cuando se ha comparado directamente el efecto de distintas representaciones dentro de un mismo experimento, todas las alternativas han utilizado los mismos pacientes y la misma asignación a los conjuntos de entrenamiento y prueba. De este modo, las diferencias observadas no se deben a cambios en la composición de la cohorte o de las particiones. 

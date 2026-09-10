@@ -19,7 +19,7 @@ María Cribillés Pérez\\
 \end{center}
 
 %\vspace{0.7cm}
-\noindent{\textbf{Palabras clave}: Biopsia pulmonar, Tomografía computarizada, Inteligencia Artificial, Predicción de complicaciones, Segmentación pulmonar, Datos clínicos, Clasificación multietiqueta, Radiómica, \textit{Deep learning}, Redes neuronales convolucionales, \textit{Positive-Unlabeled Learning}, Descubrimiento de subgrupos, Explicabilidad.}\\
+\noindent{\textbf{Palabras clave}: Biopsia pulmonar, Radiómica, \textit{Deep learning}, \textit{Positive-Unlabeled Learning}, Descubrimiento de subgrupos.}\\
 
 \vspace{0.7cm}
 \noindent{\textbf{Resumen}}\\
@@ -28,13 +28,13 @@ La biopsia pulmonar guiada por tomografía computarizada es un procedimiento dia
 
 Este trabajo estudia la predicción y caracterización de ambas complicaciones mediante una formulación multietiqueta que permite su aparición simultánea. Se utiliza una cohorte de 210 pacientes y se integra información disponible antes de la biopsia: variables clínicas, geometría del nódulo, características radiómicas, volúmenes tridimensionales de tomografía computarizada y segmentaciones anatómicas.
 
-Se han comparado modelos clásicos de radiómica, redes convolucionales tridimensionales, modelos multimodales y estrategias de transferencia de aprendizaje mediante un protocolo experimental reproducible. El estudio también incorpora \textit{Positive-Unlabeled Learning} (PU learning) para analizar la incertidumbre de las etiquetas, descubrimiento de subgrupos para identificar patrones interpretables y técnicas de explicabilidad basadas en SHAP y Grad-CAM.
+Se han comparado modelos clásicos de radiómica, redes convolucionales tridimensionales, modelos multimodales y estrategias de transferencia de aprendizaje mediante un protocolo experimental reproducible. El estudio también incorpora \textit{Positive-Unlabeled Learning} (\textit{PU learning}) para analizar la incertidumbre de las etiquetas, descubrimiento de subgrupos para identificar patrones interpretables y técnicas de explicabilidad basadas en SHAP y Grad-CAM.
 
-Los resultados muestran un rendimiento global limitado y no permiten identificar una estrategia uniformemente superior. La mejor configuración radiómica ha combinado características básicas y variables clínicas, mientras que los modelos tridimensionales han mostrado una mayor dependencia de la arquitectura, el preprocesamiento y las regiones anatómicas utilizadas. El aumento de la complejidad, la fusión multimodal y el preentrenamiento no han producido mejoras sistemáticas.
+Los resultados permiten caracterizar el comportamiento de las distintas fuentes de información y muestran oportunidades de optimización en todas las estrategias evaluadas. La mejor configuración radiómica ha combinado características básicas y variables clínicas, mientras que los modelos tridimensionales han mostrado una mayor dependencia de la arquitectura, el preprocesamiento y las regiones anatómicas utilizadas. Estos resultados ponen de manifiesto la importancia de seleccionar cuidadosamente la representación de entrada y adaptar la complejidad de los modelos a las características de la cohorte.
 
-PU learning no mejoró de forma consistente el aprendizaje supervisado, aunque permitió analizar el efecto de la incertidumbre de las etiquetas. El descubrimiento de subgrupos identificó asociaciones interpretables relacionadas con variables como el tamaño y la profundidad pleural del nódulo, sin que puedan interpretarse como relaciones causales. Finalmente, SHAP permitió estudiar la contribución de las características radiómicas y Grad-CAM mostró patrones de atención variables, en ocasiones sin una correspondencia anatómica clara.
+El análisis mediante \textit{PU learning} ha permitido estudiar el efecto de la incertidumbre de las etiquetas y ha mostrado un comportamiento dependiente de la complicación, la representación y la métrica considerada. El descubrimiento de subgrupos ha identificado asociaciones interpretables relacionadas con variables como el tamaño y la profundidad pleural del nódulo, que constituyen hipótesis de interés para su validación en cohortes adicionales. Finalmente, SHAP ha permitido estudiar la contribución de las características radiómicas y Grad-CAM ha facilitado el análisis de las regiones utilizadas por los modelos, así como la identificación de patrones de atención que requieren una revisión adicional.
 
-Las principales limitaciones son el tamaño y el desbalanceo de la cohorte, la disponibilidad desigual de las modalidades, la ausencia de validación externa y la falta de variables sobre la ejecución de la biopsia. A pesar de ello, el trabajo proporciona un marco reproducible y trazable para comparar fuentes de información, auditar la calidad de los datos y orientar futuros estudios multicéntricos sobre predicción prebiopsia.
+Los principales retos identificados están relacionados con el tamaño y el desbalanceo de la cohorte, la disponibilidad desigual de las modalidades, la ausencia de validación externa y la falta de variables sobre la ejecución de la biopsia. En conjunto, el trabajo proporciona un marco reproducible y trazable para comparar fuentes de información, auditar la calidad de los datos e identificar oportunidades de mejora que orienten futuros estudios multicéntricos sobre predicción prebiopsia.
 
 \cleardoublepage
 
@@ -50,23 +50,22 @@ María Cribillés Pérez\\
 \end{center}
 
 %\vspace{0.7cm}
-\noindent{\textbf{Keywords}: Lung biopsy, Computed tomography, Artificial intelligence, Complication prediction, Lung segmentation, Clinical data, Multilabel classification, Radiomics, Deep learning, Convolutional neural networks, Positive-Unlabeled Learning, Subgroup discovery, Explainability.}\\
+\noindent{\textbf{Keywords}: Lung biopsy, Radiomics, Deep learning, Positive-Unlabeled Learning, Subgroup discovery.}\\
 
 \vspace{0.7cm}
 \noindent{\textbf{Abstract}}\\
 
-Computed tomography-guided lung biopsy is a widely used minimally invasive diagnostic procedure for obtaining tissue samples from pulmonary lesions and determining their nature. Although it provides high diagnostic accuracy, it may lead to complications such as pulmonary hemorrhage and pneumothorax. Estimating the risk of these events before the intervention could support individualized planning and improve the allocation of monitoring measures and healthcare resources. However, the prediction of these complications remains an underexplored problem and is hindered by the limited size of the available cohorts, data heterogeneity, and class imbalance.
+Computed tomography-guided lung biopsy is a widely used minimally invasive diagnostic procedure for obtaining tissue samples from pulmonary lesions and determining their nature. Although it provides high diagnostic performance, it may be associated with complications such as pulmonary hemorrhage and pneumothorax. Estimating the risk of these events before the intervention could support individualized planning and improve the allocation of monitoring measures and healthcare resources. Nevertheless, their prediction remains an underexplored area and presents challenges arising from the limited size of the available cohorts, data heterogeneity, and class imbalance.
 
-This work investigates the prediction and characterization of both complications using a multilabel formulation that allows them to occur simultaneously. The study is based on a clinical cohort of 210 patients and integrates information available before the biopsy, including clinical variables, nodule geometry, radiomic features, three-dimensional computed tomography volumes, and anatomical segmentations.
+This work investigates the prediction and characterization of both complications using a multilabel formulation that allows them to occur simultaneously. The study uses a cohort of 210 patients and integrates information available before the biopsy, including clinical variables, nodule geometry, radiomic features, three-dimensional computed tomography volumes, and anatomical segmentations.
 
-Classical radiomics-based models, three-dimensional convolutional neural networks, multimodal models, and transfer-learning strategies were compared using a common and reproducible experimental protocol. The study also incorporates \textit{Positive-Unlabeled Learning} (PU learning) to examine label uncertainty, subgroup discovery to identify interpretable patterns, and explainability techniques based on SHAP and Grad-CAM.
+Classical radiomics-based models, three-dimensional convolutional neural networks, multimodal models, and transfer learning strategies were compared using a reproducible experimental protocol. The study also incorporates \textit{Positive-Unlabeled Learning} (\textit{PU learning}) to examine label uncertainty, subgroup discovery to identify interpretable patterns, and explainability techniques based on SHAP and Grad-CAM.
 
-The results show limited overall performance and do not identify a uniformly superior strategy. The best radiomics configuration combined basic features with clinical variables, while the three-dimensional models showed greater dependence on the architecture, preprocessing strategy, and anatomical regions used. Increasing model complexity, multimodal fusion, and pretraining did not produce systematic improvements.
+The results characterize the behavior of the different information sources and reveal opportunities for optimization across all the evaluated strategies. The best radiomics configuration combined basic features with clinical variables, whereas the three-dimensional models showed a greater dependence on the architecture, preprocessing strategy, and anatomical regions used. These findings highlight the importance of carefully selecting the input representation and adapting model complexity to the characteristics of the cohort.
 
-PU learning did not consistently outperform supervised learning, although it enabled the effects of label uncertainty to be examined. Subgroup discovery identified interpretable associations involving variables such as nodule size and distance from the pleura, but these findings cannot be interpreted as causal relationships. Finally, SHAP enabled the contribution of the radiomic features to be examined, while Grad-CAM revealed variable attention patterns, in some cases without a clear anatomical correspondence.
+The \textit{PU learning} analysis enabled the effect of label uncertainty to be examined and revealed behavior that depended on the complication, data representation, and evaluation metric considered. Subgroup discovery identified interpretable associations involving variables such as nodule size and depth relative to the pleura, providing hypotheses of interest for validation in additional cohorts. Finally, SHAP enabled the contribution of the radiomic features to be examined, while Grad-CAM facilitated the analysis of the regions used by the models and the identification of attention patterns requiring further review.
 
-The main limitations of the study are the size and class imbalance of the cohort, the unequal availability of the different data modalities, the lack of external validation, and the absence of variables describing how the biopsy was performed. Nevertheless, this work provides a reproducible and traceable framework for comparing sources of information, auditing data quality, and guiding future multicenter studies on pre-biopsy complication prediction.
-
+The main challenges identified are related to the size and class imbalance of the cohort, the unequal availability of the different data modalities, the lack of external validation, and the absence of variables describing how the biopsy was performed. Overall, this work provides a reproducible and traceable framework for comparing information sources, auditing data quality, and identifying opportunities for improvement to guide future multicenter studies on pre-biopsy complication prediction.
 
 \chapter*{}
 \thispagestyle{empty}
@@ -130,4 +129,22 @@ Y para que conste, expiden y firman el presente informe en Granada a 10 de septi
        \vspace{1cm}
 
 
-Poner aquí agradecimientos...
+Primero, quiero agradecer a mis tutores y a los médicos colaboradores del Hospital Universitario Clínico San Cecilio de Granada por su orientación y colaboración. 
+
+A mis amigos de Granada, porque habéis sido un pilar muy importante para mí todos estos años para poder desconectar y aprender a disfrutar de la vida un poco más. Nos seguiremos poniendo al día café tras café. 
+
+A mis amigos del DGIIM, aunque este haya sido el último año juntos, espero que sigamos visitando diferentes países viendo lo lejos que habéis llegado en vuestras carreras profesionales. No tengo ninguna duda de ello. 
+
+A mi familia, por el apoyo incondicional en mis estudios y por intentar sacarme una sonrisa en los momentos difíciles. Abuela, estoy en proceso de cumplir lo que prometí, el tiempo pone todo en su lugar. 
+
+A Juanlu, por ayudarme a seguir adelante aunque el camino no haya sido fácil. Gracias por estar presente en estos últimos años y por vernos crecer juntos. 
+
+
+
+\chapter*{Financiación}
+\thispagestyle{empty}
+
+       \vspace{1cm}
+
+Este trabajo ha sido realizado en el marco del Proyecto~\mbox{TSI-100927-2023-1}, financiado por el Plan de Recuperación, Transformación y Resiliencia de la Unión Europea, \textit{NextGenerationEU}, a través del Ministerio para la Transformación Digital y de la Función Pública.
+

@@ -1,6 +1,6 @@
 
 \chapter{Fundamentos}\label{chap:fundamentos}
-Este capítulo reúne los fundamentos necesarios para comprender las representaciones y metodologías empleadas posteriormente. Se introducen los conceptos relacionados con la tomografía computarizada, la radiómica, PU learning y el descubrimiento de subgrupos.
+Este capítulo reúne los fundamentos necesarios para comprender las representaciones y metodologías empleadas posteriormente. Se introducen los conceptos relacionados con la tomografía computarizada, la radiómica, \textit{PU learning} y el descubrimiento de subgrupos.
 
 
 \section{Fundamentos de la tomografía computarizada}\label{sec:fundamentos_TC}
@@ -11,7 +11,7 @@ Desde su introducción clínica a comienzos de la década de 1970, la TC ha evol
 
 El principio físico de la TC se basa en la atenuación diferencial de los rayos X al atravesar los tejidos. Cuando el haz de rayos X atraviesa el cuerpo, cada tejido atenúa la radiación en función de su composición y densidad. Los detectores registran la intensidad del haz tras atravesar al paciente y, a partir de las proyecciones obtenidas en diferentes orientaciones, se reconstruye una imagen que representa la distribución espacial de los coeficientes de atenuación. Tradicionalmente, una de las técnicas fundamentales de reconstrucción ha sido la retroproyección filtrada o \textit{filtered back projection} (FBP), que permite obtener cortes tomográficos a partir de las proyecciones adquiridas \cite{schofield2020image}.
 
-El resultado de este proceso es una imagen formada por píxeles en el plano bidimensional. Cuando se consideran múltiples cortes consecutivos, estos píxeles se extienden a vóxeles, que representan unidades de volumen dentro del espacio tridimensional. Cada vóxel contiene información sobre la atenuación del tejido correspondiente, por lo que el conjunto de cortes de TC puede interpretarse como un volumen anatómico. Esta representación volumétrica es la que permite aplicar posteriormente técnicas de análisis tridimensional, extracción de características radiómicas o modelos de deep learning 3D.
+El resultado de este proceso es una imagen formada por píxeles en el plano bidimensional. Cuando se consideran múltiples cortes consecutivos, estos píxeles se extienden a vóxeles, que representan unidades de volumen dentro del espacio tridimensional. Cada vóxel contiene información sobre la atenuación del tejido correspondiente, por lo que el conjunto de cortes de TC puede interpretarse como un volumen anatómico. Esta representación volumétrica es la que permite aplicar posteriormente técnicas de análisis tridimensional, extracción de características radiómicas o modelos de \textit{deep learning} 3D.
 
 Para estandarizar los valores de atenuación y facilitar su interpretación clínica, las intensidades de la TC se expresan en unidades Hounsfield (HU), tomando como referencias el agua y el aire \cite{calzado2010tomografia}. La conversión se define como:
 
@@ -24,6 +24,8 @@ donde $\mu_{mat}$ representa el coeficiente de atenuación lineal del tejido o m
 Sin embargo, el rango completo de intensidades HU es demasiado amplio para visualizar todos los tejidos con el mismo nivel de contraste. Por este motivo, en la práctica clínica se emplean ventanas de visualización, definidas mediante dos parámetros: el \textit{Window Level} (WL), que establece el valor central de la ventana, y el \textit{Window Width} (WW), que determina la amplitud del intervalo representado. La selección de diferentes ventanas permite resaltar estructuras concretas, como el parénquima pulmonar, el mediastino o el hueso. Este concepto resulta especialmente importante en este trabajo, ya que las ventanas HU se utilizan posteriormente durante el preprocesamiento de los volúmenes para resaltar información anatómica relevante.
 
 Una vez reconstruido el volumen de TC, este puede visualizarse en diferentes planos anatómicos. El plano axial corresponde a los cortes transversales adquiridos habitualmente durante el estudio; el plano sagital permite observar el cuerpo desde una perspectiva lateral; y el plano coronal proporciona una vista frontal. La posibilidad de reformatear el volumen en estos planos, conocida como reformateo multiplanar o \textit{Multiplanar Reformation} (MPR), es una de las ventajas principales de la TC volumétrica, ya que facilita la interpretación anatómica desde distintas orientaciones.
+
+La Figura~\ref{fig:ct_ejes_anatomicos} ilustra la correspondencia entre estos tres planos anatómicos.
 
 \begin{figure}[!htbp]
     \centering
@@ -141,7 +143,7 @@ Estas matrices permiten extraer características que reflejan diferentes aspecto
 %     \subsection{Fusión de datos imagen-tabular}
 %     \subsection{Principales limitaciones en cohortes pequeñas}
 
-\section{Fundamentos de PU learning}\label{sec:fundamentos_pu}
+\section{Fundamentos de \textit{PU learning}}\label{sec:fundamentos_pu}
     % \subsection{Planteamiento del problema positivo-sin-etiquetas}
     % \subsection{Diferencia entre aprendizaje supervisado, semisupervisado y PU Learning}
     % \subsection{Supuestos SCAR, SAR y sesgo de selección}
@@ -149,9 +151,9 @@ Estas matrices permiten extraer características que reflejan diferentes aspecto
     % \subsection{Estrategias de modelado PU}
     % \subsection{Evaluación de modelos PU en contexto clínico}
 
-    PU learning aborda problemas de clasificación binaria en los que solo se dispone de positivos identificados y de un conjunto no etiquetado. A diferencia del aprendizaje supervisado convencional, no se conoce un conjunto fiable de ejemplos negativos porque las observaciones no etiquetadas pueden contener tanto negativos reales como positivos que no han sido identificados. Tampoco se trata de un problema semisupervisado estándar, ya que en este último suelen existir ejemplos etiquetados de todas las clases, mientras que en PU learning solo una de ellas está explícitamente representada \cite{Elkan2008,Bekker2020}.
+    \textit{PU learning} aborda problemas de clasificación binaria en los que solo se dispone de positivos identificados y de un conjunto no etiquetado. A diferencia del aprendizaje supervisado convencional, no se conoce un conjunto fiable de ejemplos negativos porque las observaciones no etiquetadas pueden contener tanto negativos reales como positivos que no han sido identificados. Tampoco se trata de un problema semisupervisado estándar, ya que en este último suelen existir ejemplos etiquetados de todas las clases, mientras que en \textit{PU learning} solo una de ellas está explícitamente representada \cite{Elkan2008,Bekker2020}.
 
-    Sea \(y\in\{0,1\}\) la clase real de una observación y \(s\in\{0,1\}\) el indicador de que esta ha sido etiquetada como positiva. La formulación de PU learning supone que una observación etiquetada es realmente positiva,
+    Sea \(y\in\{0,1\}\) la clase real de una observación y \(s\in\{0,1\}\) el indicador de que esta ha sido etiquetada como positiva. La formulación de \textit{PU learning} supone que una observación etiquetada es realmente positiva,
 
     \[
     P(y=1\mid s=1)=1,
@@ -191,9 +193,9 @@ Estas matrices permiten extraer características que reflejan diferentes aspecto
 
     Las estrategias PU pueden agruparse en varios enfoques. Una aproximación sencilla consiste en tratar provisionalmente todo el conjunto no etiquetado como negativo, aunque esta decisión introduce ruido cuando contiene positivos ocultos. Otras alternativas buscan identificar negativos suficientemente fiables, corrigen las probabilidades mediante la estimación de \(c\), entrenan múltiples clasificadores sobre diferentes muestras del conjunto no etiquetado o reformulan directamente el riesgo de clasificación. Dentro de este último grupo, los estimadores de riesgo no negativo limitan el riesgo empírico para reducir el sobreajuste que puede aparecer con modelos flexibles \cite{Kiryo2017}.
 
-El método \textit{non-negative Positive-Unlabeled Learning} (nnPU) pertenece a esta última familia y permite entrenar modelos flexibles, como las redes neuronales, directamente a partir de positivos observados y casos no etiquetados. El estimador PU no sesgado puede producir durante el entrenamiento una contribución negativa del riesgo asociado a la clase negativa, favoreciendo el sobreajuste a los positivos observados. nnPU evita este comportamiento limitando dicha contribución para que no sea negativa. Su aplicación requiere estimar previamente el prior de la clase positiva, que determina el peso relativo de los términos del riesgo \cite{Kiryo2017}.
+    El método \textit{non-negative Positive-Unlabeled Learning} (nnPU) pertenece a esta última familia y permite entrenar modelos flexibles, como las redes neuronales, directamente a partir de positivos observados y casos no etiquetados. El estimador PU no sesgado puede producir durante el entrenamiento una contribución negativa del riesgo asociado a la clase negativa, favoreciendo el sobreajuste a los positivos observados. nnPU evita este comportamiento limitando dicha contribución para que no sea negativa. Su aplicación requiere estimar la probabilidad a priori de la clase positiva, que representa la proporción esperada de positivos en la población y determina el peso relativo de los términos del riesgo \cite{Kiryo2017}.
 
-    La validez de estos métodos depende del mecanismo mediante el cual se han observado las etiquetas. Si los casos positivos más graves o más evidentes tienen mayor probabilidad de ser registrados, el supuesto SCAR puede incumplirse y aparecer un escenario de selección dependiente de las características. Por ello, PU learning no demuestra por sí mismo que existan positivos ocultos ni permite recuperar automáticamente las etiquetas reales. En este trabajo se emplea como un análisis de sensibilidad ante una posible incertidumbre en el registro de las complicaciones, comparando sus resultados con los obtenidos mediante aprendizaje supervisado convencional.
+    La validez de estos métodos depende del mecanismo mediante el cual se han observado las etiquetas. Si los casos positivos más graves o más evidentes tienen mayor probabilidad de ser registrados, el supuesto SCAR puede incumplirse y aparecer un escenario de selección dependiente de las características. Por ello, \textit{PU learning} no demuestra por sí mismo que existan positivos ocultos ni permite recuperar automáticamente las etiquetas reales. En este trabajo se emplea como un análisis de sensibilidad ante una posible incertidumbre en el registro de las complicaciones, comparando sus resultados con los obtenidos mediante aprendizaje supervisado convencional.
 
 
 

@@ -30,15 +30,15 @@
 \usepackage{xcolor}
 
 % Mantiene compilable la version publica cuando una figura clinica privada no se versiona.
-\newcommand{\includeprivategraphic}[2][width=\textwidth]{%
-    \IfFileExists{#2}{%
-        \includegraphics[#1]{#2}%
-    }{%
-        \fbox{\parbox[c][0.18\textheight][c]{0.9\textwidth}{%
-            \centering Figura clínica omitida del repositorio por privacidad.%
-        }}%
-    }%
-}
+% \newcommand{\includeprivategraphic}[2][width=\textwidth]{%
+%     \IfFileExists{#2}{%
+%         \includegraphics[#1]{#2}%
+%     }{%
+%         \fbox{\parbox[c][0.18\textheight][c]{0.9\textwidth}{%
+%             \centering Figura clínica omitida del repositorio por privacidad.%
+%         }}%
+%     }%
+% }
 
 \usepackage{enumitem}
 \usepackage{tabularx}
@@ -223,8 +223,8 @@ pdfproducer = {pdflatex}
 \input{capitulos/05_EDA}
 \input{capitulos/06_Radiomica}
 \input{capitulos/07_DL}
-\input{capitulos/08_PU_learning}
-\input{capitulos/09_Subgroup_discovery}
+\input{capitulos/08_Subgroup_discovery}
+\input{capitulos/09_PU_learning}
 % \input{capitulos/10_Analisis_experimental}
 \input{capitulos/10_Explicabilidad}
 \input{capitulos/11_Conclusiones}

@@ -236,3 +236,22 @@ id_ed25519*
 *credentials*
 *secret*
 
+# --- Imagenes dentro de carpetas de pacientes ---
+# Proteccion explicita para carpetas como 210pacientes, 125pacientes o patient_*.
+**/*paciente*/**/*.png
+**/*paciente*/**/*.jpg
+**/*paciente*/**/*.jpeg
+**/*paciente*/**/*.tif
+**/*paciente*/**/*.tiff
+**/*paciente*/**/*.bmp
+**/*paciente*/**/*.gif
+**/*paciente*/**/*.webp
+**/*patient*/**/*.png
+**/*patient*/**/*.jpg
+**/*patient*/**/*.jpeg
+**/*patient*/**/*.tif
+**/*patient*/**/*.tiff
+**/*patient*/**/*.bmp
+**/*patient*/**/*.gif
+**/*patient*/**/*.webp
+

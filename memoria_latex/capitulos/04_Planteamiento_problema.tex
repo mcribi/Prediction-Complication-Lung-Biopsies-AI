@@ -37,7 +37,7 @@ Esta formulación permite obtener una predicción diferenciada para cada complic
 
 El alcance del trabajo comprende dos perspectivas complementarias. La primera es predictiva y busca evaluar hasta qué punto las distintas fuentes de información disponibles permiten anticipar la aparición de hemorragia, neumotórax o ausencia de complicaciones. Para ello, se comparan modelos basados en variables clínicas, características radiómicas, volúmenes tridimensionales de TC y combinaciones de varias fuentes de información.
 
-La segunda perspectiva es descriptiva y está orientada a comprender mejor la estructura del problema. En este sentido, el estudio no pretende limitarse a obtener una puntuación de rendimiento, sino también analizar qué variables o representaciones aportan información relevante, cómo afecta la posible incertidumbre de las etiquetas y qué perfiles de pacientes presentan una frecuencia diferencial de complicaciones. Para abordar estos aspectos se incorporan técnicas como el PU learning, destinado a explorar escenarios con posibles positivos no identificados, y el descubrimiento de subgrupos, utilizado para obtener reglas interpretables que caractericen grupos concretos de pacientes.
+La segunda perspectiva es descriptiva y está orientada a comprender mejor la estructura del problema. En este sentido, el estudio no pretende limitarse a obtener una puntuación de rendimiento, sino también analizar qué variables o representaciones aportan información relevante, cómo afecta la posible incertidumbre de las etiquetas y qué perfiles de pacientes presentan una frecuencia diferencial de complicaciones. Para abordar estos aspectos se incorporan técnicas como el \textit{PU learning}, destinado a explorar escenarios con posibles positivos no identificados, y el descubrimiento de subgrupos, utilizado para obtener reglas interpretables que caractericen grupos concretos de pacientes.
 
 Por tanto, la finalidad del trabajo no consiste exclusivamente en desarrollar el modelo con mayor rendimiento, sino en realizar una comparación metodológica amplia que permita valorar la utilidad de las distintas fuentes de información y comprender las limitaciones asociadas a una cohorte clínica de tamaño reducido y heterogénea.
 
@@ -172,13 +172,16 @@ Los volúmenes de TC utilizados fueron previamente anonimizados por el equipo cl
 El diseño experimental y la interpretación de los resultados están condicionados por las siguientes características del problema:
 
 \begin{itemize}
-    \item \textbf{Tamaño muestral reducido:} el número de pacientes es limitado en relación con la complejidad de algunos modelos, especialmente los de deep learning, lo que incrementa el riesgo de sobreajuste y limita su capacidad de generalización.
+    \item \textbf{Tamaño muestral reducido:} el número de pacientes es limitado en relación con la complejidad de algunos modelos, especialmente los de \textit{deep learning}, lo que incrementa el riesgo de sobreajuste y limita su capacidad de generalización.
 
-    \item \textbf{Distribución e incertidumbre de las etiquetas:} la hemorragia y el neumotórax presentan soportes desiguales y algunas combinaciones son poco frecuentes. El derrame pleural se consideró únicamente en el análisis exploratorio. Además, la posible existencia de eventos no registrados motivó la exploración de técnicas de PU learning.
+    \item \textbf{Distribución e incertidumbre de las etiquetas:} la hemorragia y el neumotórax presentan soportes desiguales y algunas combinaciones son poco frecuentes. El derrame pleural se consideró únicamente en el análisis exploratorio. Además, la posible existencia de eventos no registrados motivó la exploración de técnicas de \textit{PU learning}.
 
     \item \textbf{Heterogeneidad de las imágenes:} los estudios de TC proceden de distintos equipos y protocolos, con variaciones en la resolución, el espaciado, el grosor de corte y los parámetros de reconstrucción. Estas diferencias pueden introducir variabilidad técnica no relacionada con las complicaciones.
 
     \item \textbf{Alta dimensionalidad:} los volúmenes de TC y las características radiómicas contienen un número elevado de variables respecto al tamaño de la cohorte. Para reducir la redundancia y el riesgo de sobreajuste se aplicaron procedimientos de homogeneización, reducción de dimensionalidad y selección de características dentro del proceso de validación.
+
+    \item \textbf{Literatura específica limitada:} como se expone en el Capítulo~\ref{chap:estado_del_arte}, la evidencia sobre la predicción de complicaciones de la biopsia pulmonar mediante inteligencia artificial continúa siendo limitada y heterogénea. La mayoría de los trabajos se centra en una única complicación, especialmente el neumotórax, o emplea variables clínicas y procedimentales tabulares. Son menos frecuentes los estudios que incorporan directamente la imagen de TC, la radiómica o una formulación multietiqueta. Esta escasez de estudios comparables dificulta la selección de referencias experimentales y la existencia de protocolos de evaluación consolidados.
+
 \end{itemize}
 
 
@@ -197,7 +200,7 @@ El desarrollo del trabajo se ha organizado siguiendo un procedimiento estructura
 
     \item \textbf{Preprocesamiento y segmentación.} Se aplicaron procedimientos específicos para preparar los datos: limpieza y codificación de variables clínicas, selección y conversión de series de TC, normalización de intensidades, homogeneización volumétrica y segmentación anatómica.
 
-    \item \textbf{Prueba de hipótesis.} Se entrenaron y evaluaron diferentes aproximaciones basadas en aprendizaje automático, deep learning, estrategias multimodales y técnicas más avanzadas de IA para analizar su capacidad predictiva.
+    \item \textbf{Prueba de hipótesis.} Se entrenaron y evaluaron diferentes aproximaciones basadas en aprendizaje automático, \textit{deep learning}, estrategias multimodales y técnicas más avanzadas de IA para analizar su capacidad predictiva.
 
     \item \textbf{Comprobación y análisis.} Los resultados se estudiaron mediante métricas de clasificación e interpretación técnica y clínica, considerando las limitaciones del conjunto de datos y la influencia del preprocesamiento.
 
@@ -208,21 +211,20 @@ El desarrollo del trabajo se ha organizado siguiendo un procedimiento estructura
 
 
 
-\section{Software}
+\section{\textit{Software}}
 
-El desarrollo se ha realizado principalmente en Python 3.12.11. Para la implementación y el entrenamiento de los modelos de deep learning se han utilizado PyTorch 2.5.1 y MONAI 1.4.0 \cite{cardoso2022monai}. El procesamiento de las imágenes médicas se ha llevado a cabo mediante NiBabel 5.3.2, Pydicom 3.0.1 y SimpleITK 2.4.1, mientras que las segmentaciones anatómicas se han generado con TotalSegmentator \cite{wasserthal2023totalsegmentator}. La extracción de características radiómicas se ha realizado mediante PyRadiomics.
+El desarrollo se ha realizado principalmente en Python 3.12.11. Para la implementación y el entrenamiento de los modelos de \textit{deep learning} se han utilizado PyTorch 2.5.1 y MONAI 1.4.0 \cite{cardoso2022monai}. El procesamiento de las imágenes médicas se ha llevado a cabo mediante NiBabel 5.3.2, Pydicom 3.0.1 y SimpleITK 2.4.1, mientras que las segmentaciones anatómicas se han generado con TotalSegmentator \cite{wasserthal2023totalsegmentator}. La extracción de características radiómicas se ha realizado mediante PyRadiomics \cite{VanGriethuysen2017}.
 
-Para el tratamiento de los datos y la implementación de los modelos de aprendizaje automático se han empleado NumPy 2.2.6, Pandas 2.2.3, scikit-learn 1.5.2 y XGBoost 1.7.6. Los análisis exploratorios y las visualizaciones se han desarrollado con Jupyter Notebooks, Matplotlib y Seaborn. La ejecución de los experimentos se ha gestionado mediante SLURM, y se han utilizado Visual Studio Code y Git para el desarrollo y el control de versiones.
+Para el tratamiento de los datos y la implementación de los modelos de aprendizaje automático se han empleado NumPy 2.2.6, Pandas 2.2.3, scikit-learn 1.5.2 y XGBoost 1.7.6. Los análisis exploratorios y las visualizaciones se han desarrollado con Jupyter Notebooks, Matplotlib y Seaborn. Asimismo, se han utilizado Visual Studio Code y Git para el desarrollo y el control de versiones.
 
 El código desarrollado se encuentra disponible en el repositorio de GitHub \url{https://github.com/mcribi/Prediction-Complication-Lung-Biopsies-AI}. Los datos clínicos y las imágenes médicas no se han incluido en el repositorio debido a su carácter sensible.
 
 
+\section{\textit{Hardware}}
 
+Para el desarrollo experimental del proyecto se utilizaron los servidores de cómputo de alto rendimiento NGPU proporcionados por la Universidad de Granada (UGR), ubicados en el CPD Santa Lucía. Esta infraestructura permitió ejecutar las tareas con mayor coste computacional, especialmente el entrenamiento y la evaluación de los modelos.
 
-\section{Hardware}
-Para el desarrollo experimental del proyecto se utilizaron los servidores de cómputo de alto rendimiento NGPU proporcionados por la Universidad de Granada (UGR), ubicados en el CPD Santa Lucía. Esta infraestructura permitió ejecutar las tareas con mayor coste computacional, especialmente el entrenamiento y la evaluación de modelos.
-
-La infraestructura NGPU de la UGR dispone de un clúster de nodos de cómputo con distintas configuraciones de GPU, entre las que se incluyen GTX Titan, X Pascal, GTX Titan Xp, RTX 2080 Ti, Titan RTX, Tesla V100 de 32 GB y Tesla A100 de 40 GB.
+La infraestructura NGPU de la UGR dispone de un clúster de nodos de cómputo con distintas configuraciones de GPU, entre las que se incluyen GTX Titan X Pascal, GTX Titan Xp, RTX 2080 Ti, Titan RTX, Tesla V100 de 32 GB y Tesla A100 de 40 GB. Los experimentos se ejecutaron en esta infraestructura mediante Slurm, utilizado para gestionar las colas de trabajo y la asignación de recursos entre los distintos nodos de cómputo.
 
 
 \section{Presupuesto}
@@ -271,7 +273,7 @@ No obstante, para reflejar el valor aproximado de la infraestructura empleada, s
 
 \subsection{Materiales y otros gastos}
 
-No se prevén gastos adicionales en licencias de software, ya que las herramientas utilizadas durante el desarrollo del proyecto son de código abierto o de uso libre en el ámbito académico, como Python, PyTorch, MONAI, PyRadiomics, scikit-learn y otras bibliotecas empleadas para el análisis y modelado de los datos. Tampoco se consideran necesarias compras de material adicional.
+No se prevén gastos adicionales en licencias de \textit{software}, ya que las herramientas utilizadas durante el desarrollo del proyecto son de código abierto o de uso libre en el ámbito académico, como Python, PyTorch, MONAI, PyRadiomics, scikit-learn y otras bibliotecas empleadas para el análisis y modelado de los datos. Tampoco se consideran necesarias compras de material adicional.
 
 \subsection{Presupuesto total estimado}
 
